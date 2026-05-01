@@ -452,29 +452,34 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
           if (MediaQuery.of(context).size.width > 460)
             UserLibraryBar(accentColor: playlistColor),
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  MediaQuery.of(context).size.width > 460
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: MediaQuery.of(context).size.width > 460
                       ? _mainHeader()
                       : _mobileHeader(),
-                  if (playlist.tracks.isNotEmpty) ...[
-                    VerticalSection<Track>(
-                      title: 'Tracks',
-                      items: playlist.tracks,
-                      itemBuilder: (track) => Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 2,
-                        ),
-                        child: TrackCard(track: track, size: '100x100'),
-                      ),
+                ),
+                if (playlist.tracks.isNotEmpty)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    sliver: SliverFixedExtentList.builder(
+                      itemExtent: 50.0,
+                      itemCount: playlist.tracks.length,
+
+                      itemBuilder: (context, index) {
+                        final track = playlist.tracks[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 2,
+                          ),
+                          child: TrackCard(track: track, size: '100x100'),
+                        );
+                      },
                     ),
-                  ],
-                  const SizedBox(height: 40),
-                ],
-              ),
+                  ),
+                const SliverToBoxAdapter(child: SizedBox(height: 40)),
+              ],
             ),
           ),
         ],
@@ -889,7 +894,7 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                         color: playlistColor.withOpacity(0.2),
                         child: InkWell(
                           onTap: () async {
-                            final result = await FilePicker.platform.pickFiles(
+                            final result = await FilePicker.pickFiles(
                               allowMultiple: false,
                             );
                             if (result == null ||
@@ -987,12 +992,12 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                           );
                           await NetConductor().cacheFiles(
                             playlist.tracks
-                                .map(
-                                  (e) =>
-                                      YandexMusicTrack.fromYMTrack(e),
-                                )
+                                .map((e) => YandexMusicTrack.fromYMTrack(e))
                                 .toList(),
                           );
+                          Logger(
+                            "YandexWidgets/PlaylistPage",
+                          ).fine("Playlist was sucessfully cached.");
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Playlist was sucessfully cached.'),
@@ -1031,7 +1036,7 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                         color: playlistColor.withOpacity(0.2),
                         child: InkWell(
                           onTap: () async {
-                            final result = await FilePicker.platform.pickFiles(
+                            final result = await FilePicker.pickFiles(
                               allowMultiple: true,
                             );
                             if (result == null ||
@@ -1365,55 +1370,6 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                     ),
                   ),
                 ),
-                // const SizedBox(width: 5),
-                // ClipOval(
-                //   child: Material(
-                //     color: playlistColor.withOpacity(0.2),
-                //     child: InkWell(
-                //       onTap: () async {},
-                //       child: SizedBox(
-                //         height: 40,
-                //         width: 40,
-                //         child: Icon(
-                //           Icons.favorite_sharp,
-                //           color: Colors.white,
-                //           size: 21,
-                //         ),
-                //       ),
-                //     ),
-                //   ),
-                // ),
-                // const SizedBox(width: 5),
-                // ClipOval(
-                //   child: Material(
-                //     color: playlistColor.withOpacity(0.2),
-                //     child: InkWell(
-                //       onTap: () async {},
-                //       child: SizedBox(
-                //         height: 40,
-                //         width: 40,
-                //         child: Icon(Icons.waves, color: Colors.white, size: 21),
-                //       ),
-                //     ),
-                //   ),
-                // ),
-                // ClipOval(
-                //   child: Material(
-                //     color: playlistColor.withOpacity(0.2),
-                //     child: InkWell(
-                //       onTap: () async {},
-                //       child: SizedBox(
-                //         height: 40,
-                //         width: 40,
-                //         child: Icon(
-                //           Icons.download_done,
-                //           color: Colors.white,
-                //           size: 21,
-                //         ),
-                //       ),
-                //     ),
-                //   ),
-                // ),
                 if (isOwner && playlist.kind != 3) ...[
                   const SizedBox(width: 5),
                   Tooltip(
@@ -1423,7 +1379,7 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                         color: playlistColor.withOpacity(0.2),
                         child: InkWell(
                           onTap: () async {
-                            final result = await FilePicker.platform.pickFiles(
+                            final result = await FilePicker.pickFiles(
                               allowMultiple: false,
                             );
                             if (result == null ||
@@ -1504,8 +1460,7 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                       color: playlistColor.withOpacity(0.2),
                       child: InkWell(
                         onTap: () async {
-                          final result = await FilePicker.platform
-                              .getDirectoryPath();
+                          final result = await FilePicker.getDirectoryPath();
                           if (result == null) {
                             return;
                           }
@@ -1555,12 +1510,12 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                           );
                           await NetConductor().cacheFiles(
                             playlist.tracks
-                                .map(
-                                  (e) =>
-                                      YandexMusicTrack.fromYMTrack(e),
-                                )
+                                .map((e) => YandexMusicTrack.fromYMTrack(e))
                                 .toList(),
                           );
+                          Logger(
+                            "YandexWidgets/PlaylistPage",
+                          ).fine("Playlist was sucessfully cached.");
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Playlist was sucessfully cached.'),
@@ -1599,7 +1554,7 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                         color: playlistColor.withOpacity(0.2),
                         child: InkWell(
                           onTap: () async {
-                            final result = await FilePicker.platform.pickFiles(
+                            final result = await FilePicker.pickFiles(
                               allowMultiple: true,
                             );
                             if (result == null ||
@@ -2098,9 +2053,7 @@ class _ArtistInfo extends State<ArtistInfoWidget> {
                                 final List<PlayerTrack> queue = [];
                                 for (Track albumTrack in tracks!) {
                                   queue.add(
-                                    YandexMusicTrack.fromYMTrack(
-                                      albumTrack,
-                                    ),
+                                    YandexMusicTrack.fromYMTrack(albumTrack),
                                   );
                                 }
                                 await Player.player.playTemporaryQueue(
@@ -2259,10 +2212,7 @@ class _ArtistInfo extends State<ArtistInfoWidget> {
                             final List<PlayerTrack> queue = tracks != null
                                 ? tracks!
                                       .map<PlayerTrack>(
-                                        (e) =>
-                                            YandexMusicTrack.fromYMTrack(
-                                              e,
-                                            ),
+                                        (e) => YandexMusicTrack.fromYMTrack(e),
                                       )
                                       .toList()
                                 : [];
@@ -2318,7 +2268,7 @@ class _ArtistInfo extends State<ArtistInfoWidget> {
                             height: 40,
                             width: 40,
                             child: Icon(
-                              Symbols.upload,
+                              Symbols.share,
                               color: Colors.white,
                               size: 21,
                             ),
@@ -2442,9 +2392,7 @@ class _ArtistInfo extends State<ArtistInfoWidget> {
                                   ? tracks!
                                         .map<PlayerTrack>(
                                           (e) =>
-                                              YandexMusicTrack.fromYMTrack(
-                                                e,
-                                              ),
+                                              YandexMusicTrack.fromYMTrack(e),
                                         )
                                         .toList()
                                   : [];
@@ -2502,7 +2450,7 @@ class _ArtistInfo extends State<ArtistInfoWidget> {
                               height: 40,
                               width: 40,
                               child: Icon(
-                                Symbols.upload,
+                                Symbols.share,
                                 color: Colors.white,
                                 size: 21,
                               ),
@@ -3060,10 +3008,7 @@ class _AlbumInfoWidget extends State<AlbumInfoWidget> {
                             album.tracks
                                 .expand((e) => e)
                                 .toList()
-                                .map(
-                                  (e) =>
-                                      YandexMusicTrack.fromYMTrack(e),
-                                )
+                                .map((e) => YandexMusicTrack.fromYMTrack(e))
                                 .toList(),
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -3504,8 +3449,7 @@ class _AlbumInfoWidget extends State<AlbumInfoWidget> {
                   icon: Symbols.download,
                   onTap: () async {
                     try {
-                      final result = await FilePicker.platform
-                          .getDirectoryPath();
+                      final result = await FilePicker.getDirectoryPath();
                       if (result == null) {
                         return;
                       }
@@ -3526,27 +3470,10 @@ class _AlbumInfoWidget extends State<AlbumInfoWidget> {
                           ),
                         ),
                       );
-                      if (album.tracks.length > 1) {
-                        int disc = 0;
-                        for (List<Track> tracks in album.tracks) {
-                          disc += 1;
-                          await YandexMusicSingleton.exportTracks(
-                          tracks,
-                          Directory(path.join(result, "Disc $disc")),
-                          progressCallback: (a) {
-                            print("$a %");
-                          },
-                        );
-                        }
-                      } else {
-                        await YandexMusicSingleton.exportTracks(
-                          album.tracks.expand((e) => e).toList(),
-                          Directory(result),
-                          progressCallback: (a) {
-                            print("$a %");
-                          },
-                        );
-                      }
+                      await YandexMusicSingleton.exportAlbum(
+                        album,
+                        Directory(result),
+                      );
 
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -3637,7 +3564,7 @@ class _AlbumInfoWidget extends State<AlbumInfoWidget> {
                 const SizedBox(width: 5),
                 IconButton2(
                   accentColor: albumColor,
-                  icon: Symbols.upload,
+                  icon: Symbols.share,
                   onTap: () async {
                     final link = 'https://music.yandex.ru/album/${album.id}';
 
@@ -3798,7 +3725,7 @@ class VerticalSection<T> extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          // const SizedBox(height: 16),
         ],
 
         ListView.builder(
@@ -4093,9 +4020,7 @@ class TrackCard extends StatelessWidget {
         label: "Add to queue",
         value: 'queue',
         onTap: () async {
-          Player.player.insertInQueue(
-            YandexMusicTrack.fromYMTrack(track),
-          );
+          Player.player.insertInQueue(YandexMusicTrack.fromYMTrack(track));
         },
       ),
     );
@@ -4253,9 +4178,7 @@ class TrackCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () async {
-            Player.player.insertInQueue(
-              YandexMusicTrack.fromYMTrack(track),
-            );
+            Player.player.insertInQueue(YandexMusicTrack.fromYMTrack(track));
             await Player.player.playNext(forceNext: true, completed: false);
           },
           child: Row(
@@ -4596,69 +4519,74 @@ class UserLibraryBar extends StatelessWidget {
             stops: const [0.0, 0.38],
           ),
         ),
-        child: Column(
-          children: [
-            SizedBox(height: 10),
-            IconButton2(
-              // borderRadius: BorderRadius.all(Radius.circular(10)),
-              icon: Icons.arrow_back,
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            SizedBox(height: 10),
-            IconButton2(
-              borderRadius: BorderRadius.all(Radius.circular(10)),
-              icon: Icons.home,
-              onTap: () {
-                Navigator.popUntil(context, ModalRoute.withName('/player'));
-              },
-            ),
-            for (PlaylistWShortTracks playlist
-                in YandexMusicSingleton.playlists) ...[
+        child: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: Column(
+            children: [
               SizedBox(height: 10),
-              Container(
-                width: 40,
-                // width: 260,
-                // height: 260,
-                height: 40,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.all(Radius.circular(5)),
-                  image: DecorationImage(
-                    image: CachedImageProvider(
-                      '${YandexMusicSingleton.instance.playlists.getPlaylistCoverArtUrl(playlist.cover ?? {"type": "pic", "uri": "raw.githubusercontent.com/z3nsh0w/z3nsh0w.github.io/refs/heads/master/nocover.png", "custom": true})}',
-                    ),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                child: Material(
-                  clipBehavior: Clip.antiAlias,
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(5),
-
-                  child: InkWell(
-                    onTap: () async {
-                      final playlist2 = await YandexMusicSingleton
-                          .instance
-                          .playlists
-                          .getPlaylist(
-                            playlist.kind,
-                            accountId: playlist.ownerUid,
-                          );
-                      Navigator.push(
-                        context,
-                        CupertinoPageRoute(
-                          maintainState: false,
-                          builder: (builder) =>
-                              PlaylistInfoWidget(playlist: playlist2),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+              IconButton2(
+                // borderRadius: BorderRadius.all(Radius.circular(10)),
+                icon: Icons.arrow_back,
+                onTap: () {
+                  Navigator.pop(context);
+                },
               ),
+              SizedBox(height: 10),
+              IconButton2(
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+                icon: Icons.home,
+                onTap: () {
+                  Navigator.popUntil(context, ModalRoute.withName('/player'));
+                },
+              ),
+              for (PlaylistWShortTracks playlist
+                  in YandexMusicSingleton.playlists) ...[
+
+                  SizedBox(height: 10),
+                  Container(
+                    width: 40,
+                    // width: 260,
+                    // height: 260,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.all(Radius.circular(5)),
+                      image: DecorationImage(
+                        image: CachedImageProvider(
+                          '${YandexMusicSingleton.instance.playlists.getPlaylistCoverArtUrl(playlist.cover ?? {"type": "pic", "uri": "raw.githubusercontent.com/z3nsh0w/z3nsh0w.github.io/refs/heads/master/nocover.png", "custom": true})}',
+                        ),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    child: Material(
+                      clipBehavior: Clip.antiAlias,
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(5),
+
+                      child: InkWell(
+                        onTap: () async {
+                          final playlist2 = await YandexMusicSingleton
+                              .instance
+                              .playlists
+                              .getPlaylist(
+                                playlist.kind,
+                                accountId: playlist.ownerUid,
+                              );
+                          Navigator.push(
+                            context,
+                            CupertinoPageRoute(
+                              maintainState: false,
+                              builder: (builder) =>
+                                  PlaylistInfoWidget(playlist: playlist2),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+      
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
 import 'dart:async';
+import 'package:quark/services/local_api/local_api.dart';
 import 'package:quark/services/player/player.dart';
 
 import 'state_indicator.dart';
@@ -15,7 +16,7 @@ import 'package:quark/services/native_controls/native_control.dart';
 
 class Settings extends StatefulWidget {
   final Function() closeView;
-  const Settings({required this.closeView});
+  const Settings({super.key, required this.closeView});
 
   @override
   State<StatefulWidget> createState() => _SettingsState();
@@ -126,6 +127,21 @@ class _SettingsState extends State<Settings> {
                     ),
                     const SizedBox(height: 10),
                     _YandexMusicSettings(),
+                    const SizedBox(height: 15),
+
+                    Padding(
+                      padding: EdgeInsetsGeometry.only(left: 35),
+                      child: Text(
+                        'Advanced',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _AdvancedSettings(),
                   ],
                 ),
               ),
@@ -149,16 +165,10 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
   bool dynamicWindowColor = true;
   int clicks = 0;
   String restoreText = 'Restore';
-  String audioEngine = 'Restore';
+  String audioEngine = Player.player.playerBackend.value;
   bool? databaseError;
   InteractiveSliderController transitionSpeedController =
       InteractiveSliderController(1.0);
-  List<String> audioEngineList = ['Standart', 'Just Audio', 'Just Audio MK'];
-  final Map<String, PlayerBackend> backendMap = {
-    'Just Audio MK': PlayerBackend.justAudioMediaKit,
-    'Just Audio': PlayerBackend.justAudio,
-    'Standart': PlayerBackend.audioPlayers,
-  };
 
   void initDatabase() async {
     try {
@@ -169,7 +179,7 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
           DatabaseStreamerService().recursiveFilesAdding.value;
       bool dynamicWindowColor2 =
           DatabaseStreamerService().dynamicWindowColor.value;
-      
+
       if (!mounted) return;
       setState(() {
         stateIndicatorState = indicator;
@@ -227,48 +237,6 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
               crossAxisAlignment: CrossAxisAlignment.center,
               nameColor: Colors.red,
             ),
-          SizedBox(height: 1),
-          button(
-            'Audio engine',
-            'Recommended for your platform: ${Platform.isAndroid
-                ? "JustAudio"
-                : Platform.isWindows
-                ? "Standart"
-                : "JustAudioMK"}',
-            DropdownButton<String>(
-              dropdownColor: const Color.fromRGBO(44, 44, 44, 0.2),
-              value: audioEngineList.contains(audioEngine)
-                  ? audioEngine
-                  : 'Standart',
-              borderRadius: BorderRadius.all(Radius.circular(5)),
-              elevation: 16,
-              focusColor: const Color.fromARGB(113, 255, 255, 255),
-              style: const TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
-              underline: SizedBox.shrink(),
-              onChanged: (String? value) async {
-                if (value != null) {
-                  DatabaseStreamerService().playerBackend.value = value;
-                  await Player.player.stop();
-                  await Player.player.dispose();
-                  await Player.player.init(backend: backendMap[value]);
-                }
-              },
-              items: audioEngineList.map<DropdownMenuItem<String>>((
-                String value,
-              ) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-            ),
-            maxWidth,
-            rightPadding,
-            databaseError == true
-                ? ButtonPosition.center
-                : ButtonPosition.start,
-          ),
-
           SizedBox(height: 1),
           button(
             'Recursively adding files',
@@ -387,8 +355,97 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
               rightPadding,
               ButtonPosition.center,
             ),
-            SizedBox(height: 1),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AdvancedSettings extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() => _AdvancedSettingsWidget();
+}
+
+class _AdvancedSettingsWidget extends State<_AdvancedSettings> {
+  int clicks = 0;
+  String restoreText = 'Restore';
+  String audioEngine = Player.player.playerBackend.value;
+  bool? databaseError;
+  List<String> audioEngineList = ['Standart', 'Just Audio', 'Just Audio MK'];
+  final Map<String, PlayerBackend> backendMap = {
+    'Just Audio MK': PlayerBackend.justAudioMediaKit,
+    'Just Audio': PlayerBackend.justAudio,
+    'Standart': PlayerBackend.audioPlayers,
+  };
+
+  Future<void> restoreDefaults() async {
+    await DatabaseStreamerService().reset();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final maxWidth = min(size.width * 0.92 * 0.92, 800 * 0.92);
+    final rightPadding = 7.5;
+    return Center(
+      child: Column(
+        children: [
+            button(
+              'Gapless playback (Beta)',
+              'Tracks will change smoothly and without delay.',
+              Switch(
+                value: Player.player.playerBackend != PlayerBackend.audioPlayers,
+                activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
+                inactiveThumbColor: Colors.grey[300],
+                inactiveTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
+                onChanged: (a) async {
+                  final String value = a ? "Just Audio MK" : "Standart";
+                  DatabaseStreamerService().playerBackend.value = value;
+                  await Player.player.stop();
+                  await Player.player.dispose();
+                  await Player.player.init(backend: backendMap[value]);
+                  audioEngine = value;
+                  setState(() {});
+                },
+              ),
+              maxWidth,
+              rightPadding,
+              databaseError == true
+                  ? ButtonPosition.center
+                  : ButtonPosition.start,
+            ),
+
+          if (!Platform.isAndroid) ...[
+            SizedBox(height: 1),
+            button(
+              'Local API service (Beta)',
+              'Allows you to control the player using http/websocket requests. Port: ${LocalApi().port}',
+              Switch(
+                value: DatabaseStreamerService().localApi.value,
+                activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
+                inactiveThumbColor: Colors.grey[300],
+                inactiveTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
+                onChanged: (a) async {
+                  DatabaseStreamerService().localApi.value = a;
+                  a ? LocalApi().init() : LocalApi().dispose();
+                  setState(() {});
+                },
+              ),
+              maxWidth,
+              rightPadding,
+              databaseError == true
+                  ? ButtonPosition.center
+                  : ButtonPosition.start,
+            ),
+          ],
+
+          SizedBox(height: 1),
 
           button(
             'Restore defaults',
@@ -399,7 +456,7 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
                 onTap: () async {
                   if (clicks < 2) {
                     setState(() {
-                      restoreText = 'Again';
+                      restoreText = 'Click again';
                       clicks += 1;
                     });
                   } else {
@@ -412,7 +469,7 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
                 },
                 child: Container(
                   height: 30,
-                  width: 50,
+                  width: 80,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(15),
                   ),
@@ -542,7 +599,7 @@ class __YandexMusicSettingsWidget extends State<_YandexMusicSettings> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final maxWidth = min(size.width * 0.92 * 0.92, 800 * 0.92);
-    final textFieldWidth = min(size.width * 0.3, 250.0);
+    final textFieldWidth = min(size.width * 0.3, 150.0);
     final rightPadding = 7.5;
     return Center(
       child: Column(

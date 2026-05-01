@@ -19,7 +19,7 @@ abstract class DynamicWindowColor {
   static List<Color> nowColor = [Colors.transparent];
 
   static void init() {
-    if (!Platform.isLinux) {
+    if (!Platform.isLinux || !DatabaseStreamerService().dynamicWindowColor.value) {
       return;
     }
     Player.player.trackChangeNotifier.addListener(_changeColor);
@@ -76,9 +76,6 @@ abstract class DynamicWindowColor {
     });
     nowColor = colors;
     Logger("DWC").fine("Changed Color");
-    // Logger(
-    //   "DynamicWindowColor_Linux",
-    // ).info("A request to change the theme color has been sent.");
   }
 
   static void updateTitle(String title) async {

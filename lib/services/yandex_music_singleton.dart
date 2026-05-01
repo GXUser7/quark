@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -13,7 +14,7 @@ import 'package:quark/services/database/database.dart';
 import 'package:quark/services/files.dart';
 import 'package:quark/services/player/net_player.dart';
 import 'package:quark/services/player/player.dart';
-import 'package:quark/services/tagger.dart';
+import 'package:quark/services/audio_tags/tag_writer.dart';
 import 'package:yandex_music/yandex_music.dart';
 export 'package:yandex_music/yandex_music.dart';
 import 'package:image/image.dart' as img;
@@ -35,18 +36,18 @@ abstract class YandexMusicSingleton {
   static ValueNotifier<List<PlaylistWShortTracks>> userPlaylistsNotifier =
       ValueNotifier<List<PlaylistWShortTracks>>([]);
 
-  static final Map<String, List<Map<Duration, String>>> _cachedLyrics = {};
-  static final Map<String, Track> _cachedTracks = {};
+  static final Map<String, Track> cachedTracks = {};
   static final Map<String, Album2> _cachedAlbums = {};
+  static final Map<String, dynamic> _cachedConcerts = {};
   static final Map<String, ArtistInfo> _cachedArtists = {};
   static final Map<String, Playlist> _cachedPlaylists = {};
-  static final Map<String, dynamic> _cachedConcerts = {};
   static final Map<String, dynamic> _cachedNewReleases = {};
   static final Map<String, dynamic> _cachedStudioAlbums = {};
   static final Map<String, dynamic> _cachedArtistAlbums = {};
-  static final Map<String, dynamic> _cachedArtistPlaylists = {};
   static final Map<String, dynamic> _cachedArtistTracks = {};
+  static final Map<String, dynamic> _cachedArtistPlaylists = {};
   static final Map<String, dynamic> _cachedPlaylistsByKind = {};
+  static final Map<String, List<Map<Duration, String>>> _cachedLyrics = {};
 
   static void init(YandexMusic _instance) {
     instance = _instance;
@@ -115,86 +116,150 @@ abstract class YandexMusicSingleton {
     Directory directory, {
     void Function(int)? progressCallback,
   }) async {
-    final List<String> cachedTracksIds = await getCachedTrackList();
     try {
       await directory.create(recursive: true);
       final Playlist playlist = await instance.playlists.getPlaylistByUuid(
         uuid,
       );
-      final int trackCount = playlist.tracks.length;
-      final List<String> processedFilenames = [];
+      await exportTracks(playlist.tracks, directory);
+    } catch (e) {
+      Logger("YandexMusicSingleton").warning("Failed to export playlist: ", e);
+    }
+  }
 
-      for (Track track in playlist.tracks) {
-        if (!(track.available ?? false)) continue;
-        String filename =
-            "${track.artists.isNotEmpty ? "${track.artists.first.title} - " : ""}${track.title.replaceAll("/", "")}";
-        if (processedFilenames.contains(filename)) {
-          filename += "_${track.id}";
-        }
-        filename += '.flac';
-        processedFilenames.add(filename);
-        final File file = File(join(directory.path, filename));
-        try {
-          if (!file.existsSync()) {
-            await file.create(recursive: true);
-          }
-          if (cachedTracksIds.contains(track.id)) {
-            await file.writeAsBytes(
-              await File(getTrackPath(track.id)).readAsBytes(),
-            );
-          } else {
-            await file.writeAsBytes(
-              await instance.tracks.download(
-                track.id,
-                quality: switch (DatabaseStreamerService()
-                    .yandexMusicQuality
-                    .value) {
-                  'lossless' => AudioQuality.lossless,
-                  'nq' => AudioQuality.normal,
-                  'lq' => AudioQuality.low,
-                  'mp3' => AudioQuality.normal,
-                  _ => AudioQuality.normal,
+  static Future<dynamic> exportAlbum(
+    Album2 album,
+    Directory directory, {
+    void Function(int)? progressCallback,
+  }) async {
+    try {
+      directory = Directory(join(directory.path, "${album.artists.isNotEmpty ? album.artists[0].title + " - " : ""} ${album.title}"));
+      await directory.create(recursive: true);
+      if (album.tracks.length > 1) {
+        int disc = 0;
+        for (List<Track> tracks in album.tracks) {
+          disc += 1;
+          final List<String> processedFilenames =
+              await YandexMusicSingleton.exportTracks(
+                tracks,
+                Directory(join(directory.path, "Disc $disc")),
+                progressCallback: (a) {
+                  print("$a %");
                 },
-              ),
-            );
-          }
-          Picture? picture;
-          if (track.coverUri != null) {
-            final Uint8List orig = await ImageCacheService().getImage(
-              "https://${track.coverUri!.replaceAll("%%", "600x600")}",
-            );
-            final image = img.decodeImage(orig);
-            if (image != null) {
-              picture = Picture(
-                Uint8List.fromList(img.encodeJpg(image, quality: 80)),
-                "image/jpeg",
-                PictureType.coverFront,
               );
-            }
-          }
-          await AudioTagger.writeToFile(
-            file.path,
-            AudioTags(
-              title: track.title,
-              album: track.albums.isNotEmpty ? track.albums.first.title : null,
-              artist: track.artists.map((e) => e.title).toList().join(', '),
-              coverData: picture?.bytes,
-              coverMime: "image/jpeg",
-            ),
+          await exportCover(
+            "https://${album.coverUri.replaceAll("%%", "orig")}",
+            File(join(directory.path, "Disc $disc", "folder.jpg")),
           );
-          if (progressCallback != null) {
-            progressCallback(
-              ((playlist.tracks.indexOf(track) + 1) / trackCount * 100).round(),
-            );
-          }
-        } catch (e) {
-          Logger(
-            "YandexMusicSingleton",
-          ).warning("Failed to export track: ${track.id}", e);
+
+          await exportLog(
+            tracks.toList(),
+            processedFilenames,
+            File(
+              join(
+                directory.path,
+                "Disc $disc",
+                "${album.title} - Disc ${disc}.cue",
+              ),
+            ),
+            title: album.title,
+            performer: album.artists.map((e) => e.title).join(","),
+            genre: album.genre,
+            year: album.year.toString(),
+            discID: album.id.toString(),
+            comment: "quark",
+          );
         }
+      } else {
+        final List<String> processedFilenames =
+            await YandexMusicSingleton.exportTracks(
+              album.tracks.expand((e) => e).toList(),
+              directory,
+              progressCallback: (a) {
+                print("$a %");
+              },
+            );
+        await exportCover(
+          "https://${album.coverUri.replaceAll("%%", "orig")}",
+          File(join(directory.path, "folder.jpg")),
+        );
+        await exportLog(
+          album.tracks.expand((e) => e).toList(),
+          processedFilenames,
+          File(join(directory.path, "${album.title}.cue")),
+          title: album.title,
+          performer: album.artists.map((e) => e.title).join(","),
+          genre: album.genre,
+          year: album.year.toString(),
+          discID: album.id.toString(),
+          comment: "quark",
+        );
       }
     } catch (e) {
       Logger("YandexMusicSingleton").warning("Failed to export playlist: ", e);
+    }
+  }
+
+  static Future<dynamic> exportLog(
+    List<Track> tracks,
+    List<String> filenamesForTracks,
+    File file, {
+    String? year,
+    String? comment,
+    String? genre,
+    String? title,
+    String? performer,
+    String? discID,
+  }) async {
+    final IOSink openedFile = file.openWrite(encoding: utf8);
+    if (genre != null) {
+      openedFile.writeln('REM GENRE "$genre"');
+    }
+    if (year != null) {
+      openedFile.writeln('REM DATE $year');
+    }
+    if (discID != null) {
+      openedFile.writeln('REM DISCID $discID');
+    }
+    if (comment != null) {
+      openedFile.writeln('REM COMMENT "$comment"');
+    }
+    if (performer != null) {
+      openedFile.writeln('PERFORMER "$performer"');
+    }
+    if (title != null) {
+      openedFile.writeln('TITLE "$title"');
+    }
+
+    try {
+      for (int i = 0; i < tracks.length; i++) {
+        final String index = i + 1 < 10 ? "0${i + 1}" : i.toString();
+        final Track track = tracks[i];
+        final String filename = filenamesForTracks[i];
+        openedFile.writeln('FILE "$filename" WAVE');
+        openedFile.writeln('  TRACK $index AUDIO');
+        openedFile.writeln('    TITLE "${track.title}"');
+        openedFile.writeln(
+          '    PERFORMER "${track.artists.map((e) => e.title).toList().join(", ")}"',
+        );
+        openedFile.writeln('    INDEX 01 00:00:00');
+      }
+    } finally {
+      await openedFile.close();
+    }
+  }
+
+  static Future<dynamic> exportCover(String coverUrl, File file) async {
+    try {
+      final cover = await ImageCacheService().getImage(coverUrl);
+      final image = img.decodeImage(cover);
+      if (image == null) {
+        return;
+      }
+      await file.create(recursive: true);
+      await file.writeAsBytes(img.encodeJpg(image));
+    } catch (e) {
+      print(e);
     }
   }
 
@@ -203,13 +268,14 @@ abstract class YandexMusicSingleton {
     Directory directory, {
     void Function(int)? progressCallback,
   }) async {
-    final List<String> cachedTracksIds = await getCachedTrackList();
+    final List<String> processedFilenames = [];
+    final Set<String> cachedTracksIds = await getCachedTrackList();
     try {
       await directory.create(recursive: true);
-      final List<String> processedFilenames = [];
       int now = 0;
-      for (Track track in tracks) {
+      for (int i = 0; i < tracks.length; i++) {
         now += 1;
+        final track = tracks[i];
         if (!(track.available ?? false)) continue;
         String filename =
             "$now. ${track.artists.isNotEmpty ? "${track.artists.first.title} - " : ""}${track.title.replaceAll("/", "")}";
@@ -231,15 +297,7 @@ abstract class YandexMusicSingleton {
             await file.writeAsBytes(
               await instance.tracks.download(
                 track.id,
-                quality: switch (DatabaseStreamerService()
-                    .yandexMusicQuality
-                    .value) {
-                  'lossless' => AudioQuality.lossless,
-                  'nq' => AudioQuality.normal,
-                  'lq' => AudioQuality.low,
-                  'mp3' => AudioQuality.normal,
-                  _ => AudioQuality.normal,
-                },
+                quality: AudioQuality.fromString(DatabaseStreamerService().yandexMusicQuality.value),
               ),
             );
           }
@@ -267,27 +325,24 @@ abstract class YandexMusicSingleton {
               coverMime: "image/jpeg",
             ),
           );
-          if (progressCallback != null) {
-            progressCallback(
-              ((tracks.indexOf(track) + 1) / tracks.length * 100).round(),
-            );
-          }
+          progressCallback?.call(((i + 1) / tracks.length * 100).round());
         } catch (e) {
           Logger(
             "YandexMusicSingleton",
           ).warning("Failed to export track: ${track.id}", e);
         }
       }
+      return processedFilenames;
     } catch (e) {
       Logger("YandexMusicSingleton").warning("Failed to export playlist: ", e);
     }
   }
 
-  static Future<List<String>> getCachedTrackList() async {
+  static Future<Set<String>> getCachedTrackList() async {
     final List<PlayerTrack> files = await Files().getFilesFromDirectory(
       directoryPath: join(ApplicationCacheDirectory.instance.directory.path),
     );
-    final List<String> result = [];
+    final Set<String> result = {};
     for (PlayerTrack track in files) {
       if (track.filepath.contains("cisum_xednay_krauq")) {
         result.add(
@@ -400,7 +455,7 @@ abstract class YandexMusicSingleton {
 
     for (int i = 0; i < trackIds.length; i++) {
       final id = trackIds[i];
-      final cached = _cachedTracks[id];
+      final cached = cachedTracks[id];
 
       if (cached != null) {
         result[i] = cached;
@@ -417,11 +472,10 @@ abstract class YandexMusicSingleton {
         if (result[i] == null && fetchedIndex < fetched.length) {
           result[i] = fetched[fetchedIndex];
           fetchedIndex++;
-          _cachedTracks[trackIds[i]] = result[i]!;
+          cachedTracks[trackIds[i]] = result[i]!;
         }
       }
     }
-
     return result.cast<Track>();
   }
 

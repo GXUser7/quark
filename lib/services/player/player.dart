@@ -9,6 +9,9 @@ import 'package:quark/objects/playlist.dart';
 import 'package:quark/objects/track.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:just_audio/just_audio.dart' as just_audio;
+import 'package:quark/services/database/database.dart';
+import 'package:quark/services/player/net_player.dart';
+import 'package:quark/services/yandex_music_singleton.dart';
 
 enum ShuffleMode {
   /// Completely randomizes the list.
@@ -61,9 +64,21 @@ class PlaylistInfo {
 
 enum PlayerBackend {
   /// AudioPlayers package ll be used
-  audioPlayers,
-  justAudio,
-  justAudioMediaKit,
+  audioPlayers("Standart"),
+  justAudio("Just Audio"),
+  justAudioMediaKit("Just Audio MK");
+
+  final String value;
+
+  const PlayerBackend(this.value);
+}
+
+class _Next {
+  String path;
+
+  /// false if next is uri
+  bool local;
+  _Next({required this.local, required this.path});
 }
 
 class _PlayerEngine {
@@ -76,21 +91,27 @@ class _PlayerEngine {
   just_audio.AudioPlayer? justAudioPlayer;
   AudioPlayer? audioPlayersPlayer;
 
+  _Next? next;
+
   StreamSubscription? _onPlayedChanged;
   StreamSubscription? _onDurationChanged;
   StreamSubscription? _onCompleteSubscription;
 
-  Future<void> init({
-    PlayerBackend playerBackend2 = PlayerBackend.audioPlayers,
-  }) async {
+  Future<void> init(PlayerBackend playerBackend2) async {
     playerBackend = playerBackend2;
     switch (playerBackend) {
       case PlayerBackend.justAudio:
-        justAudioPlayer = just_audio.AudioPlayer();
+        justAudioPlayer = just_audio.AudioPlayer(
+          userAgent:
+              'com.google.android.youtube/17.31.35 (Linux; U; Android 13; en_US) gzip',
+        );
       case PlayerBackend.justAudioMediaKit:
         JustAudioMediaKit.ensureInitialized();
         JustAudioMediaKit.pitch = true;
-        justAudioPlayer = just_audio.AudioPlayer();
+        justAudioPlayer = just_audio.AudioPlayer(
+          userAgent:
+              'com.google.android.youtube/17.31.35 (Linux; U; Android 13; en_US) gzip',
+        );
       default:
         audioPlayersPlayer = AudioPlayer();
     }
@@ -201,12 +222,12 @@ class _PlayerEngine {
         await _onDurationChanged?.cancel();
         await _onPlayedChanged?.cancel();
 
-        _onCompleteSubscription = justAudioPlayer!.playerStateStream
-            .where(
-              (state) =>
-                  state.processingState == just_audio.ProcessingState.completed,
-            )
-            .listen((_) => onComplete(null));
+        // _onCompleteSubscription = justAudioPlayer!.playerStateStream
+        //     .where(
+        //       (state) =>
+        //           state.processingState == just_audio.ProcessingState.completed,
+        //     )
+        //     .listen((_) => onComplete(null));
 
         _onDurationChanged = justAudioPlayer!.durationStream
             .where((d) => d != null)
@@ -216,7 +237,8 @@ class _PlayerEngine {
             .where((index) => index != null)
             .distinct()
             .listen((index) async {
-              if (index! > 0) {
+              final sequenceLength = justAudioPlayer!.sequence.length;
+              if (index! > 0 && sequenceLength > 1) {
                 await justAudioPlayer!.removeAudioSourceAt(0);
                 onComplete(null);
               }
@@ -227,9 +249,19 @@ class _PlayerEngine {
         await _onCompleteSubscription?.cancel();
         await _onDurationChanged?.cancel();
         await _onPlayedChanged?.cancel();
-        _onCompleteSubscription = audioPlayersPlayer!.onPlayerComplete.listen(
-          onComplete,
-        );
+        _onCompleteSubscription = audioPlayersPlayer!.onPlayerComplete.listen((
+          _,
+        ) async {
+          onComplete(null);
+          if (playerBackend == PlayerBackend.audioPlayers) {
+            if (next == null) return;
+            await audioPlayersPlayer!.play(
+              next!.local
+                  ? DeviceFileSource(next!.path)
+                  : UrlSource(next!.path),
+            );
+          }
+        });
         _onDurationChanged = audioPlayersPlayer!.onDurationChanged.listen(
           onDuration,
         );
@@ -269,13 +301,81 @@ class _PlayerEngine {
     }
   }
 
-  Future<void> precacheNext(String filepath) async {
+  Future<void> setNextFile(String filepath) async {
     switch (playerBackend) {
       case PlayerBackend.justAudioMediaKit:
       case PlayerBackend.justAudio:
+              if (justAudioPlayer!.audioSources.length > 1) {
+          await justAudioPlayer!.removeAudioSourceRange(
+            1,
+            justAudioPlayer!.audioSources.length,
+          );
+        }
         await justAudioPlayer!.addAudioSource(
           just_audio.AudioSource.file(filepath),
         );
+      default:
+    }
+    next = _Next(local: true, path: filepath);
+  }
+
+  Future<void> setNextNet(String uri) async {
+    switch (playerBackend) {
+      case PlayerBackend.justAudioMediaKit:
+      case PlayerBackend.justAudio:
+        if (justAudioPlayer!.audioSources.length > 1) {
+          await justAudioPlayer!.removeAudioSourceRange(
+            1,
+            justAudioPlayer!.audioSources.length,
+          );
+        }
+        await justAudioPlayer!.addAudioSource(
+          just_audio.AudioSource.uri(Uri.parse(uri)),
+        );
+        next = _Next(local: false, path: uri);
+      default:
+        next = _Next(local: false, path: uri);
+    }
+  }
+
+  Future<void> getReadyFile(String filepath) async {
+    switch (playerBackend) {
+      case PlayerBackend.justAudioMediaKit:
+      case PlayerBackend.justAudio:
+        await justAudioPlayer!.setAudioSource(
+          just_audio.AudioSource.file(filepath),
+        );
+      default:
+        await audioPlayersPlayer!.setSource(DeviceFileSource(filepath));
+    }
+  }
+
+  Future<void> getReadyNet(String url) async {
+    switch (playerBackend) {
+      case PlayerBackend.justAudioMediaKit:
+      case PlayerBackend.justAudio:
+        await justAudioPlayer!.setAudioSource(
+          just_audio.AudioSource.uri(Uri.parse(url)),
+        );
+      default:
+        await audioPlayersPlayer!.setSource(UrlSource(url));
+    }
+  }
+
+  Future<void> playNext() async {
+    switch (playerBackend) {
+      case PlayerBackend.justAudioMediaKit:
+      case PlayerBackend.justAudio:
+        await justAudioPlayer!.seekToNext();
+      default:
+    }
+  }
+
+  Future<void> clearPlaylist() async {
+    switch (playerBackend) {
+      case PlayerBackend.justAudioMediaKit:
+      case PlayerBackend.justAudio:
+        await justAudioPlayer!.clearAudioSources();
       default:
     }
   }
@@ -326,22 +426,17 @@ class Player {
   final repeatModeNotifier = ValueNotifier<bool>(false);
   final shuffleModeNotifier = ValueNotifier<bool>(false);
   final volumeNotifier = ValueNotifier<double>(0.5);
-  final queueNotifier = ValueNotifier<Queue<PlayerTrack>>(
-    Queue<PlayerTrack>.from([]),
+  final queueNotifier = ValueNotifier<List<PlayerTrack>>(
+    List<PlayerTrack>.from([]),
   );
 
   /// Notifies whether the playback is playing or stopped
   final playingNotifier = ValueNotifier<bool>(false);
 
   /// It is not recommended to change this value yourself by using ```Player.unShuffledPlaylist = []```.
-  late List<PlayerTrack> unShuffledPlaylist;
+  List<PlayerTrack> unShuffledPlaylist = [];
 
   double speed = 1.0;
-
-  // AudioPlayer class listeners
-  // StreamSubscription? _onPlayedChanged;
-  // StreamSubscription? _onDurationChanged;
-  // StreamSubscription? _onCompleteSubscription;
 
   bool isPlaying = false;
   bool isRepeat = false;
@@ -351,23 +446,25 @@ class Player {
 
   PlaylistInfo playlistInfo = PlaylistInfo();
 
-  Queue<PlayerTrack> queue = Queue<PlayerTrack>.from([]);
+  List<PlayerTrack> queue = List<PlayerTrack>.from([]);
   PlayerTrack? unQueuedLastTrack;
+  List<PlayerTrack> queue2 = [];
+
+  PlayerBackend playerBackend = PlayerBackend.justAudioMediaKit;
+
 
   Future<void> init({PlayerBackend? backend}) async {
     playlistNotifier.value = playlist;
     unShuffledPlaylist = playlist;
-    final engine = Platform.isAndroid
-        ? PlayerBackend.audioPlayers
-        : PlayerBackend.justAudioMediaKit;
-    await _PlayerEngine().init(playerBackend2: backend ?? engine);
+    final PlayerBackend engine = backend ?? playerBackend;
+    DatabaseStreamerService().playerBackend.value =
+        backend?.value ?? engine.value;
+      playerBackend = backend ?? playerBackend;
+    await _PlayerEngine().init(backend ?? engine);
     await setupListeners();
   }
 
   Future<void> dispose() async {
-    // await _onCompleteSubscription?.cancel();
-    // await _onDurationChanged?.cancel();
-    // await _onPlayedChanged?.cancel();
     await _PlayerEngine().dispose();
   }
 
@@ -383,34 +480,7 @@ class Player {
         playedNotifier.value = event;
       },
     );
-
-    // await _onCompleteSubscription?.cancel();
-    // await _onDurationChanged?.cancel();
-    // await _onPlayedChanged?.cancel();
-    // _onCompleteSubscription = playerInstance.onPlayerComplete.listen((
-    //   event,
-    // ) async {
-
-    // });
-
-    // _onDurationChanged = playerInstance.onDurationChanged.listen((event) {
-    //   durationNotifier.value = event;
-    // });
-
-    // _onPlayedChanged = playerInstance.onPositionChanged.listen((event) {
-    //   playedNotifier.value = event;
-    // });
   }
-
-  // Future<Duration> getPosition() async {
-  //   Duration? position = await playerInstance.getCurrentPosition();
-  //   return position ?? Duration();
-  // }
-
-  // Future<Duration> getTrackDuration() async {
-  //   Duration? duration = await playerInstance.getDuration();
-  //   return duration ?? Duration();
-  // }
 
   Future<void> _afterFn() async {
     if (Platform.isLinux) {
@@ -418,78 +488,12 @@ class Player {
       await _PlayerEngine().setVolume(volumeNotifier.value);
       await _PlayerEngine().setSpeed(speed);
     }
-    int nowIndex = playlist.indexWhere((t) => t == nowPlayingTrack);
-    int nextIndex = (isRepeat)
-        ? nowIndex
-        : playlist.length - 1 != nowIndex
-        ? nowIndex + 1
-        : 0;
-    await _PlayerEngine().precacheNext(playlist[nextIndex].filepath);
   }
 
-  // Future<dynamic> getNextTrack() async {
-  //   if (queue.isNotEmpty) {
-  //     if (queue.isEmpty) {
-  //       if (unQueuedLastTrack != null) {
-  //         int nowIndex = playlist.indexWhere((t) => t == unQueuedLastTrack);
-  //         int nextIndex = (isRepeat)
-  //             ? nowIndex
-  //             : playlist.length - 1 != nowIndex
-  //             ? nowIndex + 1
-  //             : 0;
-  //         return (playlist[nextIndex]);
-  //       }
-  //     } else {
-  //       return queue.first;
-  //     }
-  //   }
-
-  //   int nowIndex = playlist.indexWhere((t) => t == nowPlayingTrack);
-
-  //   int nextIndex = (isRepeat)
-  //       ? nowIndex
-  //       : playlist.length - 1 != nowIndex
-  //       ? nowIndex + 1
-  //       : 0;
-  //   return (playlist[nextIndex]);
-  // }
-
   Future<void> playNext({bool? forceNext, bool? completed}) async {
-    if (queue.isNotEmpty) {
-      queue.removeFirst();
-      _notifyQueueListeners();
-      if (queue.isEmpty) {
-        if (unQueuedLastTrack != null) {
-          int nowIndex = playlist.indexWhere((t) => t == unQueuedLastTrack);
-          int nextIndex = (isRepeat && forceNext == null)
-              ? nowIndex
-              : playlist.length - 1 != nowIndex
-              ? nowIndex + 1
-              : 0;
-          nowPlayingTrack = playlist[nextIndex];
-        }
-      } else {
-        nowPlayingTrack = queue.first;
-      }
-      trackNotifier.value = nowPlayingTrack;
-      trackChangeNotifier.value = TrackChange(
-        newTrack: nowPlayingTrack,
-        reason: (completed ?? false)
-            ? ChangeReason.completed
-            : ChangeReason.external,
-      );
-      await _playIsPlaying();
-      return;
-    }
+    queue.remove(nowPlayingTrack);
 
-    int nowIndex = playlist.indexWhere((t) => t == nowPlayingTrack);
-
-    int nextIndex = (isRepeat && forceNext == null)
-        ? nowIndex
-        : playlist.length - 1 != nowIndex
-        ? nowIndex + 1
-        : 0;
-    nowPlayingTrack = playlist[nextIndex];
+    nowPlayingTrack = _getNext();
     trackNotifier.value = nowPlayingTrack;
     trackChangeNotifier.value = TrackChange(
       newTrack: nowPlayingTrack,
@@ -497,9 +501,69 @@ class Player {
           ? ChangeReason.completed
           : ChangeReason.external,
     );
-    // await playerInstance.stop();
-    await _playIsPlaying();
+    if (forceNext == true) {
+      await _playIsPlaying();
+    }
+    await _sendNext();
     return;
+  }
+
+  PlayerTrack _getNext() {
+    if (queue.isNotEmpty && queue.length > 1) {
+      if (queue.contains(nowPlayingTrack)) {
+        final nextIndex = queue.indexOf(nowPlayingTrack) + 1;
+        return queue[nextIndex];
+      } else {
+        return queue.first;
+      }
+    } else {
+      if (unQueuedLastTrack != null) {
+        final track = unQueuedLastTrack;
+        unQueuedLastTrack = null;
+        return track!;
+      }
+    }
+    int nowIndex = playlist.indexWhere((t) => t == nowPlayingTrack);
+
+    int nextIndex = (isRepeat)
+        ? nowIndex
+        : playlist.length - 1 != nowIndex
+        ? nowIndex + 1
+        : 0;
+    return playlist[nextIndex];
+  }
+
+  PlayerTrack _getPrevious() {
+    if (queue.isNotEmpty) {
+      if (queue.contains(nowPlayingTrack)) {
+        if (queue.first != nowPlayingTrack) {
+          final index = queue.indexOf(nowPlayingTrack) - 1;
+          return queue[index];
+        } else {
+          if (unQueuedLastTrack != null) return unQueuedLastTrack!;
+        }
+      }
+    }
+
+    int nowIndex = playlist.indexWhere((t) => t == nowPlayingTrack);
+    int nextIndex = nowIndex == 0
+        ? playlist.length - 1
+        : nowIndex > 0
+        ? nowIndex - 1
+        : 0;
+    return playlist[nextIndex];
+  }
+
+  Future<void> _sendNext() async {
+    final PlayerTrack nextAfter = _getNext();
+    if (await File(nextAfter.filepath).exists()) {
+      await _PlayerEngine().setNextFile(nextAfter.filepath);
+    } else {
+      final String? nextLink = await NetConductor().getPlayableLink(nextAfter);
+      if (nextLink != null) {
+        await _PlayerEngine().setNextNet(nextLink);
+      }
+    }
   }
 
   Future<void> _playIsPlaying() async {
@@ -509,40 +573,21 @@ class Player {
     }
     if (isPlaying) {
       await _PlayerEngine().play(nowPlayingTrack.filepath);
+    } else {
+      await _PlayerEngine().getReadyFile(nowPlayingTrack.filepath);
     }
-    // await playerInstance.setSource(DeviceFileSource(nowPlayingTrack.filepath));
-    // if (isPlaying) {
-    //   await playerInstance.play(DeviceFileSource(nowPlayingTrack.filepath));
-    // }
     await _afterFn();
   }
 
   Future<void> playPrevious() async {
-    if (queue.isNotEmpty) {
-      nowPlayingTrack = queue.first;
-      trackNotifier.value = nowPlayingTrack;
-      trackChangeNotifier.value = TrackChange(
-        newTrack: nowPlayingTrack,
-        reason: ChangeReason.external,
-      );
-      // await playerInstance.stop();
-      await _playIsPlaying();
-    }
-
-    int nowIndex = playlist.indexWhere((t) => t == nowPlayingTrack);
-    int nextIndex = nowIndex == 0
-        ? playlist.length - 1
-        : nowIndex > 0
-        ? nowIndex - 1
-        : 0;
-    nowPlayingTrack = playlist[nextIndex];
+    nowPlayingTrack = _getPrevious();
     trackNotifier.value = nowPlayingTrack;
     trackChangeNotifier.value = TrackChange(
       newTrack: nowPlayingTrack,
       reason: ChangeReason.external,
     );
-    // await playerInstance.stop();
     await _playIsPlaying();
+    await _sendNext();
   }
 
   Future<void> playPause(bool play) async {
@@ -564,6 +609,7 @@ class Player {
     playlist = newPlaylist;
     unShuffledPlaylist = newPlaylist;
     playlistNotifier.value = newPlaylist;
+    // await _sendNext();
   }
 
   Future<void> insertTrack(
@@ -574,6 +620,7 @@ class Player {
     playlist.insert(index, track);
     if (shuffleFix == true) unShuffledPlaylist.insert(index, track);
     playlistNotifier.value = playlist;
+    await _sendNext();
   }
 
   Future<void> moveTrack(PlayerTrack track, int newIndex) async {
@@ -582,6 +629,7 @@ class Player {
     playlist.removeAt(index);
     playlist.insert(newIndex, track);
     playlistNotifier.value = playlist;
+    await _sendNext();
   }
 
   Future<void> removeTrack(
@@ -593,6 +641,7 @@ class Player {
     if (unshuffleRemove) {
       unShuffledPlaylist.remove(track);
     }
+    await _sendNext();
   }
 
   Future<void> addTracks(List<PlayerTrack> tracks, {PlayerTrack? after}) async {
@@ -604,6 +653,7 @@ class Player {
       index += 1;
     }
     playlistNotifier.value = playlist;
+    await _sendNext();
   }
 
   Future<void> playTemporaryQueue(
@@ -618,13 +668,11 @@ class Player {
     startsNow ??= false;
     if (first == true) {
       for (PlayerTrack track in tracks.reversed) {
-        queue.addFirst(track);
+        queue.insert(0, track);
       }
     } else {
       queue.addAll(tracks);
     }
-    queue.addFirst(nowPlayingTrack);
-
     _notifyQueueListeners();
     if (startsNow) {
       await Player.player.playNext(forceNext: true, completed: false);
@@ -634,14 +682,13 @@ class Player {
 
   void insertInQueue(PlayerTrack track) {
     _createQueue();
-    queue.addFirst(track);
-    queue.addFirst(track);
+    queue.insert(0, track);
     _notifyQueueListeners();
   }
 
   void addEndQueue(PlayerTrack track) {
     _createQueue();
-    queue.addLast(track);
+    queue.add(track);
     _notifyQueueListeners();
   }
 
@@ -670,7 +717,7 @@ class Player {
   }
 
   Future<void> removeFromQueue(PlayerTrack track) async {
-    queue.remove(track);
+    // queue.remove(track);
     _notifyQueueListeners();
   }
 
@@ -711,6 +758,7 @@ class Player {
     playlist = newPlaylist;
     shuffleModeNotifier.value = true;
     playlistNotifier.value = playlist;
+    await _sendNext();
     return playlist;
   }
 
@@ -721,14 +769,14 @@ class Player {
     _notifyQueueListeners();
   }
 
-  void clearQueue() {
+  void clearQueue() async {
     queue.clear();
-    queue.add(nowPlayingTrack);
     _notifyQueueListeners();
   }
 
-  void _notifyQueueListeners() {
-    queueNotifier.value = queue;
+  void _notifyQueueListeners() async {
+    queueNotifier.value = List<PlayerTrack>.from(queue);
+    await _sendNext();
   }
 
   Future<List<PlayerTrack>> unShuffle() async {
@@ -737,15 +785,23 @@ class Player {
     playlist = unShuffledPlaylist;
     shuffleModeNotifier.value = false;
     playlistNotifier.value = playlist;
+    await _sendNext();
     return playlist;
   }
 
   Future<void> playCustom(PlayerTrack track) async {
     if (queue.contains(track)) {
-      queue = Queue.from(queue.skipWhile((e) => e != track));
-      _notifyQueueListeners();
+      final int indexOfNPT = queue.indexOf(nowPlayingTrack);
+      final int indexOfNext = queue.indexOf(track);
+      if (indexOfNPT < indexOfNext) {
+        if (indexOfNext != -1) {
+          queue.removeRange(indexOfNPT != -1 ? indexOfNPT : 0, indexOfNext);
+        }
+      }
     } else {
-      _clearQueue();
+      if (playlist.contains(track)) {
+        unQueuedLastTrack = track;
+      }
     }
     nowPlayingTrack = track;
     trackNotifier.value = nowPlayingTrack;
@@ -753,8 +809,9 @@ class Player {
       newTrack: nowPlayingTrack,
       reason: ChangeReason.external,
     );
-    // await playerInstance.stop();
+    _notifyQueueListeners();
     await _playIsPlaying();
+    await _sendNext();
   }
 
   Future<void> pause() async {

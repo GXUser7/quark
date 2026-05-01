@@ -92,6 +92,79 @@ class ImageBlurService {
   }
 }
 
+// class IMCConfiguration {
+//   static final String subDirName = "images";
+//   static final double blurRadius = 25;
+//   static final double quality = 70;
+// }
+
+// class IMC {
+//   static final IMC _instance = IMC._internal();
+//   factory IMC() => _instance;
+//   IMC._internal();
+
+//   final Map<String, Future<Uint8List?>> _cache = {};
+
+//   Future<Uint8List?> getImage(PlayerTrack track) async {
+//     final md5 = getMd5(track.cover);
+//     if (_cache.containsKey(md5)) {
+//       return _cache[md5];
+//     } else {
+//       final future = _loadImage(track);
+//       _cache[md5] = future;
+//       return future;
+//     }
+//   }
+
+// Future<Uint8List?> _loadImage(PlayerTrack track) async {
+//   switch (track.coverType) {
+//     case CoverType.builtIn:
+//       getBuiltIn(track);
+//     case CoverType.externalFile:
+//       getExternal(track);
+//     case CoverType.url:
+//       getFromUrl(track);
+//   }
+// }
+
+// Future<Uint8List?> getBuiltIn(PlayerTrack track) async {
+//   final tags = await Files.getFileTags(track.filepath, getImage: true);
+//   if (tags == null) {
+//     _cache[track.cover] = Future.value(null);
+//     return null;
+//   }
+//   await saveToDisk(getMd5(track.cover), tags.pictures.first.bytes);
+//   return tags.pictures.first.bytes;
+// }
+
+// Future<Uint8List?> getExternal(PlayerTrack track) async {
+//   final file = File(track.cover);
+//   if (! await file.exists()) {
+//     _cache[track.cover] = Future.value(null);
+//     return null;
+//   } 
+//     _cache[track.cover] = File.read;
+
+// }
+
+// Future<Uint8List?> getFromUrl(PlayerTrack track) async {
+
+// }
+
+// Future<void> saveToDisk(String key, Uint8List value) async {
+  
+// }
+
+// Future<void> readFromDisk() async {
+
+// }
+
+
+// String getMd5(dynamic info) {
+//   return md5.convert(info is String ? utf8.encode(info) : info).toString();
+// }
+// }
+
 class ImageCacheService {
   static final ImageCacheService _instance = ImageCacheService._internal();
   factory ImageCacheService() => _instance;
@@ -185,23 +258,6 @@ class ImageCacheService {
   }
 }
 
-
-class ImageService {
-  static Future<Uint8List> loadBuiltIn(String filepath) async {
-    final result = await Files.getTrackInfo((filepath, null));
-    return result.coverByted;
-  }
-
-  static Future<Uint8List> loadAnother(String filepath) async {
-    try {
-      final result = await File(filepath).readAsBytes();
-      return result;
-    } catch (e) {
-      return Uint8List(0);
-    }
-  }
-}
-
 class CachedBlurredNetworkImage extends StatefulWidget {
   final String coverUri;
   final double height;
@@ -256,7 +312,11 @@ class _CachedBlurredNetworkImageState extends State<CachedBlurredNetworkImage> {
           return SizedBox(
             width: widget.width,
             height: widget.height,
-            child: Image.memory(snapshot.data!, fit: widget.fit),
+            child: Image(
+              image: MemoryImage(snapshot.data!),
+              fit: widget.fit,
+              gaplessPlayback: true,
+            ),
           );
         }
 
@@ -639,11 +699,25 @@ class CoverImage extends StatelessWidget {
   final PlayerTrack track;
   final double height;
   final double width;
+
+  final BoxFit fit;
+  final int alphaChannel;
+  final Color backgroundColor;
+  final int alphaChannelIcon;
+  final Color iconColor;
+  final double borderRadius;
+
   const CoverImage({
     super.key,
     required this.track,
     required this.height,
     required this.width,
+    this.fit = BoxFit.cover,
+    this.backgroundColor = Colors.grey,
+    this.iconColor = Colors.white,
+    this.alphaChannelIcon = 100,
+    this.alphaChannel = 100,
+    this.borderRadius = 0,
   });
 
   @override
@@ -651,12 +725,84 @@ class CoverImage extends StatelessWidget {
     switch (track.coverType) {
       case CoverType.noCover:
         return dummyCover(width, height);
+      // return SizedBox();
       case CoverType.url:
         return CachedImage(coverUri: track.cover, height: height, width: width);
       case CoverType.externalFile:
-        return SizedBox();
+        return FutureBuilder(
+          future: loadImage(track.cover),
+          builder: (context, snapshot) {
+            if (snapshot.data != null) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(borderRadius),
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: Image.memory(snapshot.data!, fit: BoxFit.cover),
+                ),
+              );
+            }
+            if (snapshot.hasError || snapshot.data == null) {
+              return dummyCover(width, height);
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return SizedBox(
+                width: width * 0.9,
+                height: width * 0.9,
+                child: CircularProgressIndicator(
+                  color: const Color.fromARGB(100, 255, 255, 255),
+                ),
+              );
+            }
+
+            return SizedBox(width: width, height: height);
+          },
+        );
+
       case CoverType.builtIn:
-        return SizedBox();
+        return FutureBuilder(
+          future: loadBuiltIn(track.filepath),
+          builder: (context, snapshot) {
+            if (snapshot.data != null) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(borderRadius),
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: Image.memory(snapshot.data!, fit: BoxFit.cover),
+                ),
+              );
+            }
+            if (snapshot.hasError || snapshot.data == null) {
+              return dummyCover(width, height);
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return SizedBox(
+                width: width * 0.9,
+                height: width * 0.9,
+                child: CircularProgressIndicator(
+                  color: const Color.fromARGB(100, 255, 255, 255),
+                ),
+              );
+            }
+
+            return SizedBox(width: width, height: height);
+          },
+        );
+      // case CoverType.uri:
+      //   return SizedBox();
     }
   }
+}
+
+Future<Uint8List?> loadImage(String path) async {
+  if (await File(path).exists()) {
+    return await File(path).readAsBytes();
+  }
+  return null;
+}
+
+Future<Uint8List?> loadBuiltIn(String path) async {
+  final result = await Files.getFileTags(path);
+  return result?.pictures.first.bytes;
 }

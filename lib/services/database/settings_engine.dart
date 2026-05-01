@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hive/hive.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,7 +13,7 @@ import 'package:quark/services/database/database.dart';
 /// ```
 /// Database.getValue(DatabaseKeys.volume.value);
 /// ```
-/// 
+///
 enum DatabaseKeys {
   /// ```Double``` Player volume
   volume('volume'),
@@ -25,6 +27,8 @@ enum DatabaseKeys {
   originalImageSizeCoverView('original_image_size_cover_view'),
   playerBackend('player_backend'),
   justAudioPrefetch('just_audio_player_prefetch'),
+  changePlaylistWhileSelectCategory('category_playlist_change'),
+  localApi("local_api"),
 
   /// ```Boolean```
   /// recursiveFilesAdding
@@ -124,31 +128,28 @@ class Database {
 
   static bool isInited = false;
   static Object? lastError;
+  static Completer<Box>? _initCompleter;
 
-  static Future<Box?> _ensureInitialized() async {
+  static Future<Box> _ensureInitialized() async {
     if (_box != null) return _box!;
 
-    if (_isInitializing) {
-      while (_isInitializing) {
-        await Future.delayed(const Duration(milliseconds: 10));
-      }
-      return _box!;
+    if (_initCompleter != null) {
+      return await _initCompleter!.future;
     }
 
     _isInitializing = true;
+    _initCompleter = Completer<Box>();
+
     try {
       _box = await Hive.openBox('database');
       isInited = true;
       Logger('DatabaseService').fine('Inited');
+      _initCompleter!.complete(_box!);
       return _box!;
     } catch (e) {
-      switch (e) {
-        case TypeError():
-          null;
-        default:
-          Logger('Database').shout('Failed to initialize database.', e);
-          lastError = e;
-      }
+      _initCompleter!.completeError(e);
+      lastError = e;
+      rethrow;
     } finally {
       _isInitializing = false;
     }
@@ -250,5 +251,11 @@ class Database {
     if (box == null) return 'false';
     var path = box.path.toString();
     return path;
+  }
+
+  static Future<Map<String, dynamic>> getAll() async {
+    final box = await _ensureInitialized();
+    if (box == null) return {};
+    return Map<String, dynamic>.from(box.toMap());
   }
 }

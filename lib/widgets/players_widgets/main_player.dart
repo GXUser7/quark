@@ -17,7 +17,9 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:animated_expand/animated_expand.dart';
 import 'package:interactive_slider/interactive_slider.dart';
 import 'package:quark/services/database/database.dart';
+import 'package:quark/services/database/library_engine.dart';
 import 'package:quark/services/dynamic_window_color_linux.dart';
+import 'package:quark/widgets/new_widgets.dart';
 import 'package:quark/widgets/players_widgets/slider_widget.dart';
 
 // Local components&modules
@@ -252,7 +254,10 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                           : CachedImage(
                                               borderRadius: 15,
                                               coverUri:
-                                                  'https://${nowPlayingTrack.cover.replaceAll('%%', DatabaseStreamerService().originalImageSizeForCoverView.value ? 'orig' : "1000x1000")}',
+                                                  (nowPlayingTrack
+                                                      is YandexMusicTrack)
+                                                  ? 'https://${nowPlayingTrack.cover.replaceAll('%%', '300x300')}'
+                                                  : nowPlayingTrack.cover,
                                               height: 270,
                                               width: 270,
                                             ),
@@ -539,53 +544,28 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
               child:
                   (nowPlayingTrack is LocalTrack &&
                       !listEquals(nowPlayingTrack.coverByted, Uint8List(0)))
-                  ? ColorFiltered(
+                  ? CachedBlurredImageFromBytes(
                       key: ValueKey(nowPlayingTrack.filepath),
-                      colorFilter: ColorFilter.mode(
-                        Colors.black.withOpacity(0.5),
-                        BlendMode.darken,
-                      ),
-                      child: CachedBlurredImageFromBytes(
-                        key: ValueKey(nowPlayingTrack.filepath),
-                        bytes: nowPlayingTrack.coverByted,
-                        width: MediaQuery.of(context).size.width,
-                        height: MediaQuery.of(context).size.height,
-                        fit: BoxFit.cover,
-                      ),
+                      bytes: nowPlayingTrack.coverByted,
+                      width: MediaQuery.of(context).size.width,
+                      height: MediaQuery.of(context).size.height,
+                      fit: BoxFit.cover,
                     )
-                  : ColorFiltered(
+                  : CachedBlurredNetworkImage(
                       key: ValueKey(nowPlayingTrack.cover),
-                      colorFilter: ColorFilter.mode(
-                        Colors.black.withOpacity(0.5),
-                        BlendMode.darken,
-                      ),
-                      child: CachedBlurredNetworkImage(
-                        key: ValueKey(nowPlayingTrack.cover),
 
-                        coverUri:
-                            'https://${nowPlayingTrack.cover.replaceAll('%%', '300x300')}',
-                        width: MediaQuery.of(context).size.width,
-                        height: MediaQuery.of(context).size.height,
-                        fit: BoxFit.cover,
-                      ),
+                      coverUri: (nowPlayingTrack is YandexMusicTrack)
+                          ? 'https://${nowPlayingTrack.cover.replaceAll('%%', '300x300')}'
+                          : nowPlayingTrack.cover,
+                      width: MediaQuery.of(context).size.width,
+                      height: MediaQuery.of(context).size.height,
+                      fit: BoxFit.cover,
                     ),
             ),
+            Positioned.fill(
+              child: ColoredBox(color: Colors.black.withOpacity(0.5)),
+            ),
 
-            // VideoWidget(
-            //   url:
-            //       "https://rr4---sn-ajixh5-55.googlevideo.com/videoplayback?expire=1775336886&ei=VinRaaXGNYiQ77MP8ayogAY&ip=82.25.161.83&id=o-AKo6NaBWOao8fC3aw0UYRKORrMN3vnyI7KHtF6My-CU3&itag=18&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&cps=236&met=1775315286%2C&mh=-l&mm=31%2C29&mn=sn-ajixh5-55%2Csn-5goeen7y&ms=au%2Crdu&mv=m&mvi=4&pl=24&rms=au%2Cau&initcwndbps=1002500&bui=AUUZDGLynsw1H065rGwgmmaSoYPRRx824-7iJiuI2Rdq65fsqbuhM92cwMx2GXMzWPakhSrV9_g-cPPM&spc=jlWavVj8Z0rricKnhqJNovA-nljfFS2jQ0L-YvCjZIbW3B9KEEvh&vprv=1&svpuc=1&mime=video%2Fmp4&rqh=1&cnr=14&ratebypass=yes&dur=4928.969&lmt=1743539395753934&mt=1775314890&fvip=3&fexp=51565115%2C51565681&c=ANDROID_VR&txp=5438534&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Ccnr%2Cratebypass%2Cdur%2Clmt&sig=AHEqNM4wRQIgDSKRSnJWlqBwHz03gGHBZwWtGjZ8JYSMqcW-gdVwG7ICIQDQQOHH6AutyFTNvwkISrVWQhzHlwUkaXtGTy54pnNw4w%3D%3D&lsparams=cps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms%2Cinitcwndbps&lsig=APaTxxMwRgIhALNIzFmU-9Jpf93f4sdM3DSpB-r81Hut-ge6g2XjkkWpAiEA2TEu_hO7m4j719_i60E_rs0-jMzBwRZN93-qZLLhzgY%3D",
-            // ),
-
-            // Positioned.fill(
-            //       child: ClipRect(
-            //         child: BackdropFilter(
-            //           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            //           child: Container(
-            //             color: Colors.black.withAlpha(100),
-            //           ),
-            //         ),
-            //       ),
-            //     ),
             SizedBox(
               height: MediaQuery.of(context).size.height,
               width: MediaQuery.of(context).size.width,
@@ -631,7 +611,9 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                 : CachedImage(
                                     borderRadius: 10,
                                     coverUri:
-                                        'https://${nowPlayingTrack.cover.replaceAll('%%', '300x300')}',
+                                        (nowPlayingTrack is YandexMusicTrack)
+                                        ? 'https://${nowPlayingTrack.cover.replaceAll('%%', '300x300')}'
+                                        : nowPlayingTrack.cover,
                                     height: 270,
                                     width: 270,
                                   ),
@@ -1117,8 +1099,7 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                                 .value;
 
                                         String? selectedDirectory =
-                                            await FilePicker.platform
-                                                .getDirectoryPath();
+                                            await FilePicker.getDirectoryPath();
                                         if (selectedDirectory != null) {
                                           List<PlayerTrack> result =
                                               await Files()
@@ -1150,6 +1131,31 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                         }),
                                         Icons.settings,
                                       ),
+
+                                      // animatedExpandButton(() async {
+                                      //   final playlists = await AppDatabase()
+                                      //       .getAllPlaylistsWithTracks();
+
+                                      //   Navigator.push(
+                                      //     context,
+                                      //     CupertinoPageRoute(
+                                      //       builder: (_) {
+                                      //         return LocalPlaylists(
+                                      //           closeView: () {},
+                                      //           playlists: playlists
+                                      //               .map(
+                                      //                 (e) =>
+                                      //                     LocalPlaylistAbout.getFromDatabase(
+                                      //                       e,
+                                      //                     ),
+                                      //               )
+                                      //               .toList(),
+                                      //           playlistRouter: (_) {},
+                                      //         );
+                                      //       },
+                                      //     ),
+                                      //   );
+                                      // }, Icons.sports_golf),
                                       animatedExpandButton(() async {
                                         Navigator.pop(context);
                                       }, Icons.exit_to_app),

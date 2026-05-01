@@ -248,7 +248,7 @@ class YandexMusicApiAsync {
       transport: transport,
       timestamp: timestamp,
     );
-    print(codecs.join(','));
+    // print(codecs.join(','));
 
     Map<String, dynamic> query = {
       'ts': timestamp,
@@ -731,7 +731,7 @@ class YandexMusicApiAsync {
     bool withBestResults = true,
     CancelToken? cancelToken,
   }) async {
-    print(types.map((e) => e.value).join(','));
+    // print(types.map((e) => e.value).join(','));
     return await requests.customGet('/search/instant/mixed', {
       'text': query,
       'page': page,

@@ -9,8 +9,11 @@ import 'package:logging/logging.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:quark/services/database/database.dart';
 import 'package:audio_service_mpris/audio_service_mpris.dart';
+import 'package:quark/services/database/library_engine.dart';
 import 'package:quark/services/database/listen_logger.dart';
 import 'package:quark/services/dynamic_window_color_linux.dart';
+import 'package:quark/services/local_api/local_api.dart';
+import 'package:quark/services/ytmusic_services.dart';
 
 // Local files
 import '/objects/track.dart';
@@ -33,14 +36,20 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApplicationCacheDirectory.instance.init();
   Hive.init(ApplicationCacheDirectory.instance.directory.path);
-  Database.init();
-  Player.player.init();
+
+  await Database.init();
+  await DatabaseStreamerService().init();
+  Player.player.init(
+    backend: DatabaseStreamerService().playerBackend.value == "standart"
+        ? PlayerBackend.audioPlayers
+        : null,
+  );
   NativeControl().init();
   AudioServiceMpris.registerWith();
-  DatabaseStreamerService().init();
   DynamicWindowColor.init();
-  // await ListenLogger().init();
-
+  LocalApi().init();
+  ListenLogger().init();
+  AppDatabase().init();
   runApp(const Quark());
 }
 
@@ -79,7 +88,7 @@ class _MainPageState extends State<MainPage> {
   Future<void> pickFolder() async {
     try {
       final bool rfa = DatabaseStreamerService().recursiveFilesAdding.value;
-      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+      String? selectedDirectory = await FilePicker.getDirectoryPath();
       if (selectedDirectory != null) {
         List<PlayerTrack> result = await Files().getFilesFromDirectory(
           directoryPath: selectedDirectory,
@@ -128,9 +137,9 @@ class _MainPageState extends State<MainPage> {
   /// Routing to playlist page
   Future<void> playlistRoute(PlayerPlaylist playlist) async {
     lastPlaylist = playlist;
+
     Player.player.updatePlaylistInfo(PlaylistInfo.fromPlayerPlaylist(playlist));
     await Player.player.updatePlaylist(playlist.tracks);
-
     PlayerTrack? foundTrack;
     if (lastTrackPath != null) {
       for (final track in playlist.tracks) {
@@ -140,7 +149,6 @@ class _MainPageState extends State<MainPage> {
         }
       }
     }
-
     final trackToPlay = foundTrack ?? playlist.tracks[0];
 
     await Player.player.pause();
@@ -158,23 +166,16 @@ class _MainPageState extends State<MainPage> {
       context,
       CupertinoPageRoute(
         settings: RouteSettings(name: "/player"),
-        builder: (context) =>
-            PlaylistPage(playlist: playlist, yandexMusic: yandexMusic),
+        builder: (context) => PlaylistPage(),
       ),
     );
   }
 
   /// Reaction on playlist restore button
   Future<void> playlistRestore() async {
-    String token = DatabaseStreamerService().yandexMusicToken.value;
     if (lastPlaylist == null) {
       return;
     }
-    bool inited = await yandexMusic.checkInit();
-    if (!inited) {
-      yandexMusic = YandexMusic(token: token);
-    }
-
     playlistRoute(lastPlaylist!);
   }
 
@@ -228,6 +229,42 @@ class _MainPageState extends State<MainPage> {
           log.shout('Unexcepted error while ymUpdate()', e);
           return;
       }
+    }
+  }
+
+  Future<void> _onYTMusicPlaylistSelected(String playlistId) async {
+    try {
+      final yt = YTMusicAPI();
+      final response = await yt.getPlaylist(playlistId);
+
+      final tracks = response.allTracks
+          .map((yt) => YTMusicTrack.fromApiTrack(yt.raw))
+          .toList();
+
+      Player.player.updatePlaylistInfo(
+        PlaylistInfo(
+          kind: 0,
+          source: PlaylistSource.youtube,
+          name: response.title ?? 'YouTube Music',
+        ),
+      );
+      await Player.player.updatePlaylist(tracks);
+
+      if (tracks.isNotEmpty) {
+        await Player.player.playCustom(tracks.first);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+
+        Navigator.push(
+          context,
+          CupertinoPageRoute(builder: (_) => PlaylistPage()),
+        );
+      });
+    } catch (e) {
+      Logger('MainPage').severe('YTMusic playlist error: $e');
     }
   }
 
@@ -300,13 +337,14 @@ class _MainPageState extends State<MainPage> {
   }
 
   Future<void> _databaseBootStrap() async {
-    await DatabaseStreamerService().init();
+    Player.player.setVolume(DatabaseStreamerService().volume.value);
     addDatabaseListeners();
     final token = DatabaseStreamerService().yandexMusicToken.value;
+
+    await restoreLast();
     if (token.isNotEmpty) {
       await _initYM(token);
     }
-    await restoreLast();
   }
 
   @override
@@ -407,6 +445,14 @@ class _MainPageState extends State<MainPage> {
                   }, 'Add folder'),
                   const SizedBox(height: 12.5),
                   _mainPageButton(() async => await ymUpdate(), 'Yandex Music'),
+                  // YTMUSIC
+                  const SizedBox(height: 12.5),
+                  _mainPageButton(
+                    () async => await _onYTMusicPlaylistSelected(
+                      'OLAK5uy_nNutR-J9j_crO8GqSKSbEF-fQVGnPVBzE',
+                    ),
+                    'Youtube Music(Alpha)',
+                  ),
                 ],
               ),
             ),
@@ -510,7 +556,7 @@ class _MainPageState extends State<MainPage> {
               settingsView == false)
             Positioned(
               right: Platform.isAndroid ? 15 : 5,
-              top: Platform.isAndroid ? 15 : 5,
+              top: Platform.isAndroid ? 30 : 5,
               child: IconButton(
                 onPressed: () {
                   setState(() {

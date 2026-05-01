@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:quark/services/database/database.dart';
@@ -20,31 +22,43 @@ Widget playlistSearch(
   TextEditingController searchController,
   Function(String newView) search,
 ) {
-  return TextField(
-    cursorColor: Colors.white.withOpacity(0.8),
-    cursorErrorColor: Colors.white,
-    onChanged: (value) {
-      search(value);
-    },
-    controller: searchController,
-    style: TextStyle(color: Colors.white.withOpacity(0.8)),
-    decoration: InputDecoration(
-      hintText: 'Search',
-      hintStyle: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16),
-      border: UnderlineInputBorder(
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
-      ),
-      enabledBorder: UnderlineInputBorder(
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
-      ),
-      focusedBorder: UnderlineInputBorder(
-        borderSide: BorderSide(
-          color: Colors.white.withOpacity(0.5),
-          width: 1.5,
+  return SizedBox(
+    height: 40,
+    child: TextField(
+      cursorColor: Colors.white.withOpacity(0.8),
+      cursorErrorColor: Colors.white,
+      onChanged: (value) {
+        search(value);
+      },
+      controller: searchController,
+      style: TextStyle(color: Colors.white.withOpacity(0.8)),
+      decoration: InputDecoration(
+        hintText: 'Search',
+        hintStyle: TextStyle(
+          color: Colors.white.withOpacity(0.7),
+          fontSize: 14,
         ),
+        border: UnderlineInputBorder(
+          borderSide: BorderSide(
+            color: Colors.white.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        enabledBorder: UnderlineInputBorder(
+          borderSide: BorderSide(
+            color: Colors.white.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(
+            color: Colors.white.withOpacity(0.5),
+            width: 1.5,
+          ),
+        ),
+        filled: false,
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
-      filled: false,
-      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     ),
   );
 }
@@ -84,7 +98,7 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
   List<PlayerTrack> playlistView = [];
   SearchArtist? bestArtistResult;
   SearchAlbum? bestAlbumResult;
-
+  final _menuOpened = ValueNotifier<bool>(false);
   late final TextEditingController _searchController;
 
   Timer? _searchDebounceTimer;
@@ -279,9 +293,21 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
       );
     }
 
+    final height = 61.0; // DEFAULT 71 - songElement cover size 55x55
+    final offset = currentIndex * height;
     if (currentIndex != -1 && _scrollController.hasClients) {
       _scrollController.animateTo(
-        currentIndex * 71.0,
+        _scrollController.offset == offset ? 0 : offset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void scrollToStart() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
@@ -295,6 +321,106 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
       }
       Player.player.moveTrack(playlistView[oldIndex], newIndex);
     }
+  }
+
+  void locateToAlbum(String name) {
+    if (_searchController.text == '') {
+      final List<PlayerTrack> album = Player.player.playlist
+          .where((e) => e.albums.contains(name))
+          .toList();
+      setState(() {
+        playlistView = album;
+      });
+      scrollToStart();
+      return;
+    }
+  }
+
+  void sortByArtist(String name) {
+    if (_searchController.text == '') {
+      final List<PlayerTrack> byArtist = Player.player.playlist
+          .where((e) => e.artists.contains(name))
+          .toList();
+      setState(() {
+        playlistView = byArtist;
+      });
+      scrollToStart();
+      return;
+    }
+  }
+
+  void showAll() {
+    setState(() {
+      playlistView = Player.player.playlist;
+    });
+    scrollToCurrentTrack();
+    return;
+  }
+
+  List<Widget> getCategories() {
+    final List<Widget> result = [];
+
+    final SizedBox gap = const SizedBox(width: 5);
+
+    final artists = Player.player.playlist
+        .expand((track) => track.artists)
+        .toSet();
+    final albums = Player.player.playlist
+        .expand((track) => track.albums)
+        .toSet();
+    result.add(
+      TextButton(
+        onPressed: () {
+          showAll();
+        },
+        style: TextButton.styleFrom(
+          backgroundColor: Colors.black.withAlpha(50),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: Text("All"),
+      ),
+    );
+    result.add(gap);
+    for (String album in albums) {
+      result.add(
+        TextButton(
+          onPressed: () {
+            locateToAlbum(album);
+          },
+          style: TextButton.styleFrom(
+            backgroundColor: Colors.black.withAlpha(50),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: Text(album),
+        ),
+      );
+      result.add(gap);
+    }
+    for (String artist in artists) {
+      result.add(
+        TextButton(
+          onPressed: () {
+            sortByArtist(artist);
+          },
+          style: TextButton.styleFrom(
+            backgroundColor: Colors.black.withAlpha(50),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: Text(artist),
+        ),
+      );
+      result.add(gap);
+    }
+    return result;
   }
 
   @override
@@ -340,41 +466,41 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
                       maxWidth: MediaQuery.of(context).size.width,
                       maxHeight: MediaQuery.of(context).size.height,
                       alignment: Alignment.centerLeft,
-                      child: ColorFiltered(
-                        colorFilter: ColorFilter.mode(
-                          Colors.black.withOpacity(0.5),
-                          BlendMode.darken,
-                        ),
-                        child:
-                            (Player.player.nowPlayingTrack is LocalTrack &&
-                                !listEquals(
-                                  Player.player.nowPlayingTrack.coverByted,
-                                  Uint8List(0),
-                                ))
-                            ? CachedBlurredImageFromBytes(
-                                key: ValueKey(
-                                  Player.player.nowPlayingTrack.filepath,
-                                ),
-                                bytes: Player.player.nowPlayingTrack.coverByted,
-                                width: MediaQuery.of(context).size.width,
-                                height: MediaQuery.of(context).size.height,
-                                fit: BoxFit.cover,
-                              )
-                            : CachedBlurredNetworkImage(
-                                key: ValueKey(
-                                  Player.player.nowPlayingTrack.cover,
-                                ),
-                                coverUri:
-                                    'https://${Player.player.nowPlayingTrack.cover.replaceAll('%%', '300x300')}',
-                                width: MediaQuery.of(context).size.width,
-                                height: MediaQuery.of(context).size.height,
-                                fit: BoxFit.cover,
+                      child:
+                          (Player.player.nowPlayingTrack is LocalTrack &&
+                              !listEquals(
+                                Player.player.nowPlayingTrack.coverByted,
+                                Uint8List(0),
+                              ))
+                          ? CachedBlurredImageFromBytes(
+                              key: ValueKey(
+                                Player.player.nowPlayingTrack.filepath,
                               ),
-                      ),
+                              bytes: Player.player.nowPlayingTrack.coverByted,
+                              width: MediaQuery.of(context).size.width,
+                              height: MediaQuery.of(context).size.height,
+                              fit: BoxFit.cover,
+                            )
+                          : CachedBlurredNetworkImage(
+                              key: ValueKey(
+                                Player.player.nowPlayingTrack.cover,
+                              ),
+                              coverUri:
+                                  (Player.player.nowPlayingTrack
+                                      is YandexMusicTrack)
+                                  ? 'https://${Player.player.nowPlayingTrack.cover.replaceAll('%%', '300x300')}'
+                                  : Player.player.nowPlayingTrack.cover,
+                              width: MediaQuery.of(context).size.width,
+                              height: MediaQuery.of(context).size.height,
+                              fit: BoxFit.cover,
+                            ),
                     ),
                   ),
                 ),
-
+              if (widget.background)
+                Positioned.fill(
+                  child: ColoredBox(color: Colors.black.withOpacity(0.5)),
+                ),
               Container(
                 width: widget.width,
                 height: MediaQuery.of(context).size.height,
@@ -384,16 +510,47 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
                     Column(
                       children: [
                         Padding(
+                          padding: EdgeInsetsGeometry.fromLTRB(10, 5, 10, 0),
+                          child: appBar(
+                            widget.closePlaylist,
+                            () {},
+                            () {},
+                            scrollToCurrentTrack,
+                          ),
+                        ),
+                        Padding(
                           padding: const EdgeInsets.only(
-                            top: 50,
                             left: 15,
                             right: 15,
                             bottom: 10,
                           ),
                           child: playlistSearch(_searchController, search),
                         ),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: 15,
+                            right: 15,
+                            bottom: 10,
+                          ),
+                          child: ScrollConfiguration(
+                            behavior: ScrollConfiguration.of(context).copyWith(
+                              dragDevices: {
+                                PointerDeviceKind.touch,
+                                PointerDeviceKind.mouse,
+                                PointerDeviceKind.trackpad,
+                              },
+                            ),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(children: getCategories()),
+                            ),
+                          ),
+                        ),
                         Expanded(
                           child: ReorderableListView.builder(
+                            // controller: _scrollController,
+                            itemExtent: 61.0,
+                            cacheExtent: 100.0,
                             scrollController: _scrollController,
                             itemCount: playlistView.length,
                             onReorder: (int oldIndex, int newIndex) async {
@@ -412,7 +569,6 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
                                     child: child,
                                   );
                                 },
-
                             itemBuilder: (context, index) {
                               final track = playlistView[index];
                               final mainKey = ValueKey(
@@ -431,11 +587,7 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
                                       index: index,
                                       queued: false,
                                       track: playlistView[index],
-                                      menuOpened: menuOpened,
-                                      onMenuOpen: () =>
-                                          setState(() => menuOpened = true),
-                                      onMenuClose: () =>
-                                          setState(() => menuOpened = false),
+                                      menuOpenedNotifier: _menuOpened,
                                       showOperation: widget.showOperation,
                                       findSimilar: findSimilar,
                                     ),
@@ -503,11 +655,7 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
                                         queued: true,
                                         index: index,
                                         track: track,
-                                        menuOpened: menuOpened,
-                                        onMenuOpen: () =>
-                                            setState(() => menuOpened = true),
-                                        onMenuClose: () =>
-                                            setState(() => menuOpened = false),
+                                        menuOpenedNotifier: _menuOpened,
                                         showOperation: widget.showOperation,
                                         findSimilar: findSimilar,
                                       ),
@@ -538,11 +686,7 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
                                   queued: false,
                                   index: index,
                                   track: playlistView[index],
-                                  menuOpened: menuOpened,
-                                  onMenuOpen: () =>
-                                      setState(() => menuOpened = true),
-                                  onMenuClose: () =>
-                                      setState(() => menuOpened = false),
+                                  menuOpenedNotifier: _menuOpened,
                                   findSimilar: findSimilar,
                                   showOperation: widget.showOperation,
                                 ),
@@ -551,17 +695,6 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
                           ),
                         ),
                       ],
-                    ),
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      right: 10,
-                      child: appBar(
-                        widget.closePlaylist,
-                        () {},
-                        () {},
-                        scrollToCurrentTrack,
-                      ),
                     ),
                   ],
                 ),
@@ -577,10 +710,7 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
 class PlaylistTileWidget extends StatelessWidget {
   final int index;
   final PlayerTrack track;
-  final bool menuOpened;
   final bool queued;
-  final VoidCallback onMenuOpen;
-  final VoidCallback onMenuClose;
   final void Function(int) findSimilar;
   final void Function(StateIndicatorOperation) showOperation;
 
@@ -588,17 +718,15 @@ class PlaylistTileWidget extends StatelessWidget {
   final double popupSpaceBetween = 10;
   final Color popupTextColor = const Color.fromARGB(220, 255, 255, 255);
   final Color popupIconsColor = const Color.fromARGB(170, 255, 255, 255);
-
+  final ValueNotifier<bool> menuOpenedNotifier;
   const PlaylistTileWidget({
     super.key,
     required this.index,
     required this.track,
-    required this.menuOpened,
-    required this.onMenuOpen,
-    required this.onMenuClose,
     required this.findSimilar,
     required this.queued,
     required this.showOperation,
+    required this.menuOpenedNotifier,
   });
 
   void likeUnlike(int index) async {
@@ -626,289 +754,261 @@ class PlaylistTileWidget extends StatelessWidget {
     }
   }
 
+  List<PopupMenuEntry> _buildMenuItems(BuildContext context) {
+    return [
+      if (track is YandexMusicTrack)
+   PopupMenuItem(
+          onTap: () => likeUnlike(index),
+          child: Row(
+            children: [
+              Icon(Icons.favorite, size: popupIconSize, color: popupIconsColor),
+              SizedBox(width: popupSpaceBetween),
+              Text(
+                YandexMusicSingleton.likedTracksNotifier.value.contains(
+                      (track as YandexMusicTrack).track.id,
+                    )
+                    ? 'Unlike'
+                    : 'Like',
+                style: TextStyle(fontFamily: 'noto', color: popupTextColor),
+              ),
+            ],
+          ),
+        ),
+      if (!queued)
+        PopupMenuItem(
+          onTap: () => removeTrackFromPlaylist(index),
+          child: Row(
+            children: [
+              Icon(
+                Icons.delete_sweep_rounded,
+                size: popupIconSize,
+                color: popupIconsColor,
+              ),
+              SizedBox(width: popupSpaceBetween),
+              Text(
+                'Remove from playlist',
+                style: TextStyle(fontFamily: 'noto', color: popupTextColor),
+              ),
+            ],
+          ),
+        ),
+      if (queued)
+        PopupMenuItem(
+          onTap: () async => await Player.player.removeFromQueue(track),
+          child: Row(
+            children: [
+              Icon(
+                Icons.delete_sweep_rounded,
+                size: popupIconSize,
+                color: popupIconsColor,
+              ),
+              SizedBox(width: popupSpaceBetween),
+              Text(
+                'Remove from queue',
+                style: TextStyle(fontFamily: 'noto', color: popupTextColor),
+              ),
+            ],
+          ),
+        ),
+      if (!queued)
+        PopupMenuItem(
+          onTap: () => addNextQueue(index),
+          child: Row(
+            children: [
+              Icon(
+                CupertinoIcons.arrow_up_to_line,
+                size: popupIconSize,
+                color: popupIconsColor,
+              ),
+              SizedBox(width: popupSpaceBetween),
+              Text(
+                'Play next',
+                style: TextStyle(fontFamily: 'noto', color: popupTextColor),
+              ),
+            ],
+          ),
+        ),
+      if (track is YandexMusicTrack)
+        PopupMenuItem(
+          onTap: () async {
+            int selected = 0;
+            final value = await showDialog<int>(
+              context: context,
+              builder: (context) => WarningMessage(
+                messageHeader: 'Choose playlist',
+                messageDiscription: '',
+                buttons: YandexMusicSingleton.playlists
+                    .map((e) => e.title)
+                    .toList(),
+              ),
+            );
+
+            if (value == null) return;
+            selected = value;
+            try {
+              await YandexMusicSingleton.instance.playlists.insertTrack(
+                YandexMusicSingleton.playlists[selected].kind,
+                (track as YandexMusicTrack).track.id,
+                albumId:
+                    (track as YandexMusicTrack).track.trackSource ==
+                        TrackSource.UGC
+                    ? null
+                    : (track as YandexMusicTrack).track.albums[0].id.toString(),
+              );
+              showOperation(StateIndicatorOperation.success);
+            } catch (e) {
+              showOperation(StateIndicatorOperation.error);
+            }
+          },
+          enabled: track.albums.isNotEmpty,
+          child: Row(
+            children: [
+              Icon(
+                Icons.queue_outlined,
+                size: popupIconSize,
+                color: popupIconsColor,
+              ),
+              SizedBox(width: popupSpaceBetween),
+              Text(
+                'Add to yandex playlist',
+                style: TextStyle(fontFamily: 'noto', color: popupTextColor),
+              ),
+            ],
+          ),
+        ),
+      if (track is YandexMusicTrack &&
+          (track as YandexMusicTrack).track.trackSource != TrackSource.UGC)
+        PopupMenuItem(
+          onTap: () => findSimilar(index),
+          enabled: track.albums.isNotEmpty,
+          child: Row(
+            children: [
+              Icon(
+                CupertinoIcons.search,
+                size: popupIconSize,
+                color: popupIconsColor,
+              ),
+              SizedBox(width: popupSpaceBetween),
+              Text(
+                'Find similar',
+                style: TextStyle(fontFamily: 'noto', color: popupTextColor),
+              ),
+            ],
+          ),
+        ),
+      if (track is YandexMusicTrack &&
+          (track as YandexMusicTrack).track.trackSource != TrackSource.UGC)
+        PopupMenuItem(
+          enabled: track.albums.isNotEmpty,
+          onTap: () async {
+            try {
+              if (!YandexMusicSingleton.inited) {
+                final String tok =
+                    DatabaseStreamerService().yandexMusicToken.value;
+                YandexMusicSingleton.init(YandexMusic(token: tok));
+              }
+              final artist = await YandexMusicSingleton.getArtistInfo(
+                ((track as YandexMusicTrack).track.artists[0] as OfficialArtist)
+                    .id,
+              );
+              if (context.mounted) {
+                Navigator.push(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (_) => ArtistInfoWidget(artist: artist!),
+                  ),
+                );
+              }
+            } catch (e) {
+              Logger("PlaylistWidget").warning("Failed to get album info.", e);
+              showOperation(StateIndicatorOperation.error);
+            }
+          },
+          child: Row(
+            children: [
+              Icon(
+                CupertinoIcons.person,
+                size: popupIconSize,
+                color: popupIconsColor,
+              ),
+              SizedBox(width: popupSpaceBetween),
+              Text(
+                'View artist',
+                style: TextStyle(fontFamily: 'noto', color: popupTextColor),
+              ),
+            ],
+          ),
+        ),
+      if (track is YandexMusicTrack &&
+          (track as YandexMusicTrack).track.albums.isNotEmpty &&
+          (track as YandexMusicTrack).track.trackSource != TrackSource.UGC)
+        PopupMenuItem(
+          enabled: track.albums.isNotEmpty,
+          onTap: () async {
+            try {
+              if (!YandexMusicSingleton.inited) {
+                final String tok =
+                    DatabaseStreamerService().yandexMusicToken.value;
+                YandexMusicSingleton.init(YandexMusic(token: tok));
+              }
+
+              final album = await YandexMusicSingleton.getAlbumInfo(
+                (track as YandexMusicTrack).track.albums[0].id,
+              );
+              if (context.mounted) {
+                Navigator.push(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (_) => AlbumInfoWidget(album: album),
+                  ),
+                );
+              }
+            } catch (e) {
+              Logger("PlaylistWidget").warning("Failed to get album info.", e);
+              showOperation(StateIndicatorOperation.error);
+            }
+          },
+          child: Row(
+            children: [
+              Icon(
+                CupertinoIcons.music_albums,
+                size: popupIconSize,
+                color: popupIconsColor,
+              ),
+              SizedBox(width: popupSpaceBetween),
+              Text(
+                'View album',
+                style: TextStyle(fontFamily: 'noto', color: popupTextColor),
+              ),
+            ],
+          ),
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      onTap: () async => await Player.player.playCustom(track),
-      title: songElement(track),
-      trailing: PopupMenuButton(
-        iconColor: Colors.white.withOpacity(0.6),
-        elevation: 1000,
-        offset: const Offset(70, 0),
-        color: const Color.fromARGB(20, 255, 255, 255),
-        onCanceled: () => onMenuClose(),
-        itemBuilder: (context) {
-          if (menuOpened) return [];
-
-          onMenuOpen();
-
-          return [
-            if (track is YandexMusicTrack)
-              PopupMenuItem(
-                onTap: () => likeUnlike(index),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.favorite,
-                      size: popupIconSize,
-                      color: popupIconsColor,
-                    ),
-                    SizedBox(width: popupSpaceBetween),
-                    Text(
-                      YandexMusicSingleton.likedTracksNotifier.value.contains(
-                            (track as YandexMusicTrack).track.id,
-                          )
-                          ? 'Unlike'
-                          : 'Like',
-                      style: TextStyle(
-                        fontFamily: 'noto',
-                        color: popupTextColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (!queued)
-              PopupMenuItem(
-                onTap: () => removeTrackFromPlaylist(index),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.delete_sweep_rounded,
-                      size: popupIconSize,
-                      color: popupIconsColor,
-                    ),
-                    SizedBox(width: popupSpaceBetween),
-                    Text(
-                      'Remove from playlist',
-                      style: TextStyle(
-                        fontFamily: 'noto',
-                        color: popupTextColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (queued)
-              PopupMenuItem(
-                onTap: () async => await Player.player.removeFromQueue(track),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.delete_sweep_rounded,
-                      size: popupIconSize,
-                      color: popupIconsColor,
-                    ),
-                    SizedBox(width: popupSpaceBetween),
-                    Text(
-                      'Remove from queue',
-                      style: TextStyle(
-                        fontFamily: 'noto',
-                        color: popupTextColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (!queued)
-              PopupMenuItem(
-                onTap: () => addNextQueue(index),
-                child: Row(
-                  children: [
-                    Icon(
-                      CupertinoIcons.arrow_up_to_line,
-                      size: popupIconSize,
-                      color: popupIconsColor,
-                    ),
-                    SizedBox(width: popupSpaceBetween),
-                    Text(
-                      'Play next',
-                      style: TextStyle(
-                        fontFamily: 'noto',
-                        color: popupTextColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (track is YandexMusicTrack)
-              PopupMenuItem(
-                onTap: () async {
-                  int selected = 0;
-                  final value = await showDialog<int>(
-                    context: context,
-                    builder: (context) => WarningMessage(
-                      messageHeader: 'Choose playlist',
-                      messageDiscription: '',
-                      buttons: YandexMusicSingleton.playlists
-                          .map((e) => e.title)
-                          .toList(),
-                    ),
-                  );
-
-                  if (value == null) return;
-                  selected = value;
-                  try {
-                    await YandexMusicSingleton.instance.playlists.insertTrack(
-                      YandexMusicSingleton.playlists[selected].kind,
-                      (track as YandexMusicTrack).track.id,
-                      albumId:
-                          (track as YandexMusicTrack).track.trackSource ==
-                              TrackSource.UGC
-                          ? null
-                          : (track as YandexMusicTrack).track.albums[0].id
-                                .toString(),
-                    );
-                    showOperation(StateIndicatorOperation.success);
-                  } catch (e) {
-                    showOperation(StateIndicatorOperation.error);
-                  }
-                },
-                enabled: track.albums.isNotEmpty,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.queue_outlined,
-                      size: popupIconSize,
-                      color: popupIconsColor,
-                    ),
-                    SizedBox(width: popupSpaceBetween),
-                    Text(
-                      'Add to yandex playlist',
-                      style: TextStyle(
-                        fontFamily: 'noto',
-                        color: popupTextColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (track is YandexMusicTrack &&
-                (track as YandexMusicTrack).track.trackSource !=
-                    TrackSource.UGC)
-              PopupMenuItem(
-                onTap: () => findSimilar(index),
-                enabled: track.albums.isNotEmpty,
-                child: Row(
-                  children: [
-                    Icon(
-                      CupertinoIcons.search,
-                      size: popupIconSize,
-                      color: popupIconsColor,
-                    ),
-                    SizedBox(width: popupSpaceBetween),
-                    Text(
-                      'Find similar',
-                      style: TextStyle(
-                        fontFamily: 'noto',
-                        color: popupTextColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (track is YandexMusicTrack &&
-                (track as YandexMusicTrack).track.trackSource !=
-                    TrackSource.UGC)
-              PopupMenuItem(
-                enabled: track.albums.isNotEmpty,
-                onTap: () async {
-                  try {
-                    if (!YandexMusicSingleton.inited) {
-                      final String tok =
-                          DatabaseStreamerService().yandexMusicToken.value;
-                      YandexMusicSingleton.init(YandexMusic(token: tok));
-                    }
-                    final artist = await YandexMusicSingleton.getArtistInfo(
-                      ((track as YandexMusicTrack).track.artists[0]
-                              as OfficialArtist)
-                          .id,
-                    );
-                    if (context.mounted) {
-                      Navigator.push(
-                        context,
-                        CupertinoPageRoute(
-                          builder: (_) => ArtistInfoWidget(artist: artist!),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    Logger(
-                      "PlaylistWidget",
-                    ).warning("Failed to get album info.", e);
-                    showOperation(StateIndicatorOperation.error);
-                  }
-                },
-                child: Row(
-                  children: [
-                    Icon(
-                      CupertinoIcons.person,
-                      size: popupIconSize,
-                      color: popupIconsColor,
-                    ),
-                    SizedBox(width: popupSpaceBetween),
-                    Text(
-                      'View artist',
-                      style: TextStyle(
-                        fontFamily: 'noto',
-                        color: popupTextColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (track is YandexMusicTrack &&
-                (track as YandexMusicTrack).track.albums.isNotEmpty &&
-                (track as YandexMusicTrack).track.trackSource !=
-                    TrackSource.UGC)
-              PopupMenuItem(
-                enabled: track.albums.isNotEmpty,
-                onTap: () async {
-                  try {
-                    if (!YandexMusicSingleton.inited) {
-                      final String tok =
-                          DatabaseStreamerService().yandexMusicToken.value;
-                      YandexMusicSingleton.init(YandexMusic(token: tok));
-                    }
-
-                    final album = await YandexMusicSingleton.getAlbumInfo(
-                      (track as YandexMusicTrack).track.albums[0].id,
-                    );
-                    if (context.mounted) {
-                      Navigator.push(
-                        context,
-                        CupertinoPageRoute(
-                          builder: (_) => AlbumInfoWidget(album: album),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    Logger(
-                      "PlaylistWidget",
-                    ).warning("Failed to get album info.", e);
-                    showOperation(StateIndicatorOperation.error);
-                  }
-                },
-                child: Row(
-                  children: [
-                    Icon(
-                      CupertinoIcons.music_albums,
-                      size: popupIconSize,
-                      color: popupIconsColor,
-                    ),
-                    SizedBox(width: popupSpaceBetween),
-                    Text(
-                      'View album',
-                      style: TextStyle(
-                        fontFamily: 'noto',
-                        color: popupTextColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ];
-        },
+    return RepaintBoundary(
+      child: ListTile(
+        onTap: () async => await Player.player.playCustom(track),
+        title: songElement(track),
+        trailing: GestureDetector(
+          onTapDown: (details) async {
+            final position = RelativeRect.fromLTRB(
+              details.globalPosition.dx,
+              details.globalPosition.dy,
+              details.globalPosition.dx,
+              details.globalPosition.dy,
+            );
+            await showMenu(
+              context: context,
+              position: position,
+                color: Colors.white.withAlpha(25),
+              items: _buildMenuItems(context),
+            );
+          },
+          child: Icon(Icons.more_vert, color: Colors.white.withOpacity(0.6)),
+        ),
       ),
     );
   }
@@ -918,8 +1018,8 @@ Widget songElement(PlayerTrack track) {
   return Row(
     children: [
       Container(
-        height: 55,
-        width: 55,
+        height: 45,
+        width: 45,
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
@@ -937,7 +1037,10 @@ Widget songElement(PlayerTrack track) {
               )
             : CachedImage(
                 borderRadius: 3,
-                coverUri: 'https://${track.cover.replaceAll('%%', '300x300')}',
+                coverUri: (track is YandexMusicTrack)
+                    ? 'https://${track.cover.replaceAll('%%', '300x300')}'
+                    : track.cover,
+
                 height: 55,
                 width: 55,
                 alphaChannel: 255,
@@ -947,7 +1050,6 @@ Widget songElement(PlayerTrack track) {
               ),
       ),
       const SizedBox(width: 10),
-
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -959,7 +1061,7 @@ Widget songElement(PlayerTrack track) {
               style: TextStyle(
                 color: Colors.white,
                 fontFamily: 'noto',
-                fontSize: 16,
+                fontSize: 14,
               ),
             ),
             Text(
@@ -968,7 +1070,7 @@ Widget songElement(PlayerTrack track) {
               style: TextStyle(
                 color: const Color.fromARGB(255, 185, 185, 185),
                 fontFamily: 'noto',
-                fontSize: 16,
+                fontSize: 13,
               ),
             ),
           ],
@@ -1013,7 +1115,6 @@ Widget yandexMusicArtist(SearchArtist track) {
             Text(
               track.name,
               overflow: TextOverflow.ellipsis,
-
               style: TextStyle(
                 color: Colors.white,
                 fontFamily: 'noto',
@@ -1056,20 +1157,15 @@ Widget appBar(
         style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w600,
-          fontSize: 18,
+          fontSize: 15,
           fontFamily: 'noto',
         ),
       ),
 
-      Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            onPressed: togglePlaylist,
-            icon: Icon(Icons.close),
-            color: Colors.white.withOpacity(0.8),
-          ),
-        ],
+      IconButton(
+        onPressed: togglePlaylist,
+        icon: Icon(Icons.close),
+        color: Colors.white.withOpacity(0.8),
       ),
     ],
   );
@@ -1077,16 +1173,11 @@ Widget appBar(
 
 BoxDecoration overlayBoxDecoration() {
   return BoxDecoration(
-    color: Colors.white.withOpacity(0.2),
+    color: Colors.white.withOpacity(0.025),
     border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
     borderRadius: const BorderRadius.only(
       topRight: Radius.circular(20),
       bottomRight: Radius.circular(20),
-    ),
-    gradient: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomRight,
-      colors: [Colors.white.withOpacity(0.15), Colors.white.withOpacity(0.05)],
     ),
   );
 }

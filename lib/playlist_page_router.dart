@@ -15,13 +15,9 @@ import 'services/player/player.dart';
 import '/objects/playlist.dart';
 
 class PlaylistPage extends StatefulWidget {
-  final PlayerPlaylist playlist;
-  final YandexMusic yandexMusic;
 
   const PlaylistPage({
     super.key,
-    required this.playlist,
-    required this.yandexMusic,
   });
 
   @override
@@ -36,7 +32,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
   }
 
   void init() async {
-
+    print("INITED01");
   }
 
   @override
