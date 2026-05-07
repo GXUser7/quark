@@ -3,7 +3,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:quark/services/database/database.dart';
-import 'package:quark/services/yandex_music_singleton.dart';
+import 'package:quark/services/yandex_music/yandex_music_singleton.dart';
 import 'package:quark/widgets/players_widgets/main_player.dart';
 import 'package:quark/widgets/yandex_music_integration/yandex_widgets.dart';
 import '../../services/cached_images.dart';
@@ -14,7 +14,6 @@ import 'package:quark/services/player/player.dart';
 import '/widgets/state_indicator.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:quark/objects/track.dart';
-import 'package:path_provider/path_provider.dart';
 
 /// TODO: make GestureDetector on ScrollUp/Down to create smooth playlist scrolling as in the SilkyScroll package
 
@@ -34,6 +33,8 @@ Widget playlistSearch(
       style: TextStyle(color: Colors.white.withOpacity(0.8)),
       decoration: InputDecoration(
         hintText: 'Search',
+        // icon: Icon(Icons.search, color: Colors.white.withOpacity(0.7),),
+
         hintStyle: TextStyle(
           color: Colors.white.withOpacity(0.7),
           fontSize: 14,
@@ -379,8 +380,10 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
+          minimumSize: Size.zero,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         ),
-        child: Text("All"),
+        child: Text("All", style: TextStyle(fontSize: 14)),
       ),
     );
     result.add(gap);
@@ -396,8 +399,10 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
+            minimumSize: Size.zero,
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
           ),
-          child: Text(album),
+          child: Text(album, style: TextStyle(fontSize: 14)),
         ),
       );
       result.add(gap);
@@ -414,8 +419,10 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
+            minimumSize: Size.zero,
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
           ),
-          child: Text(artist),
+          child: Text(artist, style: TextStyle(fontSize: 14)),
         ),
       );
       result.add(gap);
@@ -526,26 +533,28 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
                           ),
                           child: playlistSearch(_searchController, search),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            left: 15,
-                            right: 15,
-                            bottom: 10,
-                          ),
-                          child: ScrollConfiguration(
-                            behavior: ScrollConfiguration.of(context).copyWith(
-                              dragDevices: {
-                                PointerDeviceKind.touch,
-                                PointerDeviceKind.mouse,
-                                PointerDeviceKind.trackpad,
-                              },
+                        if (DatabaseStreamerService().categories.value)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 15,
+                              right: 15,
+                              bottom: 5,
                             ),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(children: getCategories()),
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context)
+                                  .copyWith(
+                                    dragDevices: {
+                                      PointerDeviceKind.touch,
+                                      PointerDeviceKind.mouse,
+                                      PointerDeviceKind.trackpad,
+                                    },
+                                  ),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(children: getCategories()),
+                              ),
                             ),
                           ),
-                        ),
                         Expanded(
                           child: ReorderableListView.builder(
                             // controller: _scrollController,
@@ -757,7 +766,7 @@ class PlaylistTileWidget extends StatelessWidget {
   List<PopupMenuEntry> _buildMenuItems(BuildContext context) {
     return [
       if (track is YandexMusicTrack)
-   PopupMenuItem(
+        PopupMenuItem(
           onTap: () => likeUnlike(index),
           child: Row(
             children: [
@@ -1003,7 +1012,7 @@ class PlaylistTileWidget extends StatelessWidget {
             await showMenu(
               context: context,
               position: position,
-                color: Colors.white.withAlpha(25),
+              color: Colors.white.withAlpha(25),
               items: _buildMenuItems(context),
             );
           },
@@ -1051,29 +1060,33 @@ Widget songElement(PlayerTrack track) {
       ),
       const SizedBox(width: 10),
       Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              track.title,
-              overflow: TextOverflow.ellipsis,
+        child: Padding(
+          padding: EdgeInsetsGeometry.only(top: 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                track.title,
+                overflow: TextOverflow.ellipsis,
 
-              style: TextStyle(
-                color: Colors.white,
-                fontFamily: 'noto',
-                fontSize: 14,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'noto',
+                  fontSize: 14,
+                ),
               ),
-            ),
-            Text(
-              track.artists.join(', '),
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: const Color.fromARGB(255, 185, 185, 185),
-                fontFamily: 'noto',
-                fontSize: 13,
+              Text(
+                track.artists.join(', '),
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 185, 185, 185),
+                  fontFamily: 'noto',
+                  fontSize: 13,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ],

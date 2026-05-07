@@ -33,7 +33,7 @@ import '../../services/player/player.dart';
 import '../../services/cached_images.dart';
 import '../../widgets/state_indicator.dart';
 import '../../services/player/net_player.dart';
-import '../../services/yandex_music_singleton.dart';
+import '../../services/yandex_music/yandex_music_singleton.dart';
 import '../yandex_music_integration/yandex_widgets.dart';
 import '../yandex_music_integration/lyrics_playlist_extension.dart';
 
@@ -566,6 +566,7 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
               child: ColoredBox(color: Colors.black.withOpacity(0.5)),
             ),
 
+            Transform.scale(scale: 1, child: 
             SizedBox(
               height: MediaQuery.of(context).size.height,
               width: MediaQuery.of(context).size.width,
@@ -1132,30 +1133,30 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                         Icons.settings,
                                       ),
 
-                                      // animatedExpandButton(() async {
-                                      //   final playlists = await AppDatabase()
-                                      //       .getAllPlaylistsWithTracks();
+                                      animatedExpandButton(() async {
+                                        final playlists = await AppDatabase()
+                                            .getAllPlaylistsWithTracks();
 
-                                      //   Navigator.push(
-                                      //     context,
-                                      //     CupertinoPageRoute(
-                                      //       builder: (_) {
-                                      //         return LocalPlaylists(
-                                      //           closeView: () {},
-                                      //           playlists: playlists
-                                      //               .map(
-                                      //                 (e) =>
-                                      //                     LocalPlaylistAbout.getFromDatabase(
-                                      //                       e,
-                                      //                     ),
-                                      //               )
-                                      //               .toList(),
-                                      //           playlistRouter: (_) {},
-                                      //         );
-                                      //       },
-                                      //     ),
-                                      //   );
-                                      // }, Icons.sports_golf),
+                                        Navigator.push(
+                                          context,
+                                          CupertinoPageRoute(
+                                            builder: (_) {
+                                              return LocalPlaylists(
+                                                closeView: () {},
+                                                playlists: playlists
+                                                    .map(
+                                                      (e) =>
+                                                          LocalPlaylistAbout.getFromDatabase(
+                                                            e,
+                                                          ),
+                                                    )
+                                                    .toList(),
+                                                playlistRouter: (_) {},
+                                              );
+                                            },
+                                          ),
+                                        );
+                                      }, Icons.sports_golf),
                                       animatedExpandButton(() async {
                                         Navigator.pop(context);
                                       }, Icons.exit_to_app),
@@ -1171,7 +1172,7 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-            ),
+            )),
             if (stateIndicator)
               Positioned(
                 top: 15,

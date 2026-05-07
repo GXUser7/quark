@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:pool/pool.dart';
-import 'package:quark/services/ytmusic_services.dart';
-import 'package:quark/services/ytmusic.dart' as ytm;
+import 'package:quark/services/youtube_music/ytmusic_services.dart';
+import 'package:quark/services/youtube_music/ytmusic.dart' as ytm;
 
 import 'player.dart';
 import 'package:async/async.dart';

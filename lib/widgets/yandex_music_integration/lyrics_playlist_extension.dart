@@ -1,14 +1,11 @@
 import 'dart:ui';
-import 'package:dio/dio.dart';
-import 'package:logging/logging.dart';
 import 'package:flutter/material.dart';
 import 'package:quark/services/database/database.dart';
 import '/widgets/state_indicator.dart';
 import 'package:quark/objects/track.dart';
 import 'package:quark/services/player/player.dart';
 import 'package:quark/services/cached_images.dart';
-import 'package:quark/services/yandex_music_singleton.dart';
-import 'package:audio_metadata_reader/audio_metadata_reader.dart';
+import 'package:quark/services/yandex_music/yandex_music_singleton.dart';
 
 class LyricsView extends StatefulWidget {
   final Function(StateIndicatorOperation operation) showOperation;

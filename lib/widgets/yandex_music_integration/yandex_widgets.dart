@@ -13,7 +13,7 @@ import 'package:path/path.dart' as path;
 import 'package:quark/objects/track.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:quark/services/player/net_player.dart';
-import '../../services/yandex_music_singleton.dart';
+import '../../services/yandex_music/yandex_music_singleton.dart';
 import 'package:quark/services/cached_images.dart';
 import 'package:quark/services/player/player.dart';
 import 'package:quark/widgets/players_widgets/main_player.dart';

@@ -1,8 +1,8 @@
 import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:quark/services/yandex_music_my_vibe.dart';
-import 'package:quark/services/yandex_music_singleton.dart';
+import 'package:quark/services/yandex_music/yandex_music_my_vibe.dart';
+import 'package:quark/services/yandex_music/yandex_music_singleton.dart';
 import 'package:quark/widgets/players_widgets/main_player.dart';
 import '/widgets/state_indicator.dart';
 import 'package:quark/services/player/player.dart';

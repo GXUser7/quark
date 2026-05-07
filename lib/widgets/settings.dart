@@ -281,6 +281,29 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
             ButtonPosition.center,
           ),
           SizedBox(height: 1),
+          ValueListenableBuilder(
+            valueListenable: DatabaseStreamerService().categories,
+            builder: (context, originalSize, child) {
+              return button(
+                'Categories',
+                'Show quick navigation by album or artist.',
+                Switch(
+                  value: originalSize,
+                  activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
+                  inactiveThumbColor: Colors.grey[300],
+                  inactiveTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
+                  // activeThumbColor: Colors.white,
+                  onChanged: (a) {
+                    DatabaseStreamerService().categories.value = a;
+                  },
+                ),
+                maxWidth,
+                rightPadding,
+                ButtonPosition.start,
+              );
+            },
+          ),
+          SizedBox(height: 1),
 
           button(
             'State indicator',
@@ -396,30 +419,30 @@ class _AdvancedSettingsWidget extends State<_AdvancedSettings> {
     return Center(
       child: Column(
         children: [
-            button(
-              'Gapless playback (Beta)',
-              'Tracks will change smoothly and without delay.',
-              Switch(
-                value: Player.player.playerBackend != PlayerBackend.audioPlayers,
-                activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
-                inactiveThumbColor: Colors.grey[300],
-                inactiveTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
-                onChanged: (a) async {
-                  final String value = a ? "Just Audio MK" : "Standart";
-                  DatabaseStreamerService().playerBackend.value = value;
-                  await Player.player.stop();
-                  await Player.player.dispose();
-                  await Player.player.init(backend: backendMap[value]);
-                  audioEngine = value;
-                  setState(() {});
-                },
-              ),
-              maxWidth,
-              rightPadding,
-              databaseError == true
-                  ? ButtonPosition.center
-                  : ButtonPosition.start,
+          button(
+            'Gapless playback (Beta)',
+            'Tracks will change smoothly and without delay.',
+            Switch(
+              value: Player.player.playerBackend != PlayerBackend.audioPlayers,
+              activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
+              inactiveThumbColor: Colors.grey[300],
+              inactiveTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
+              onChanged: (a) async {
+                final String value = a ? "Just Audio MK" : "Standart";
+                DatabaseStreamerService().playerBackend.value = value;
+                await Player.player.stop();
+                await Player.player.dispose();
+                await Player.player.init(backend: backendMap[value]);
+                audioEngine = value;
+                setState(() {});
+              },
             ),
+            maxWidth,
+            rightPadding,
+            databaseError == true
+                ? ButtonPosition.center
+                : ButtonPosition.start,
+          ),
 
           if (!Platform.isAndroid) ...[
             SizedBox(height: 1),

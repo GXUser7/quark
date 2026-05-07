@@ -7,7 +7,7 @@ import 'package:quark/services/dynamic_window_color_linux.dart';
 import 'package:quark/widgets/players_widgets/slider_widget.dart';
 import '../../services/cached_images.dart';
 import 'package:quark/services/player/player.dart';
-import 'package:quark/services/yandex_music_singleton.dart';
+import 'package:quark/services/yandex_music/yandex_music_singleton.dart';
 
 class MacroPlayer extends StatefulWidget {
   final double? maxWidth;

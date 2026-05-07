@@ -8,7 +8,7 @@ import 'package:quark/objects/track.dart';
 // Additional packages
 import 'package:logging/logging.dart';
 import 'package:quark/services/cached_images.dart';
-import 'package:quark/services/yandex_music_singleton.dart';
+import 'package:quark/services/yandex_music/yandex_music_singleton.dart';
 import 'package:interactive_slider/interactive_slider.dart';
 
 // Local components&modules

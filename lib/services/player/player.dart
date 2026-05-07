@@ -11,7 +11,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:just_audio/just_audio.dart' as just_audio;
 import 'package:quark/services/database/database.dart';
 import 'package:quark/services/player/net_player.dart';
-import 'package:quark/services/yandex_music_singleton.dart';
+import 'package:quark/services/yandex_music/yandex_music_singleton.dart';
 
 enum ShuffleMode {
   /// Completely randomizes the list.

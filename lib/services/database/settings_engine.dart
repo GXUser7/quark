@@ -29,6 +29,7 @@ enum DatabaseKeys {
   justAudioPrefetch('just_audio_player_prefetch'),
   changePlaylistWhileSelectCategory('category_playlist_change'),
   localApi("local_api"),
+  playlistCategories("playlist_categories"),
 
   /// ```Boolean```
   /// recursiveFilesAdding

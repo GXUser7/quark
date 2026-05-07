@@ -5,7 +5,7 @@ import 'dart:ui';
 import 'package:quark/objects/track.dart';
 import 'package:quark/objects/playlist.dart';
 import 'package:quark/services/cached_images.dart';
-import 'package:quark/services/yandex_music_singleton.dart';
+import 'package:quark/services/yandex_music/yandex_music_singleton.dart';
 import 'package:quark/widgets/yandex_music_integration/yandex_widgets.dart';
 import 'package:yandex_music/yandex_music.dart';
 

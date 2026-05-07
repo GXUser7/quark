@@ -54,6 +54,7 @@ class DatabaseStreamerService {
   final justAudioPrefetch = ValueNotifier<bool>(false);
   final changePlaylistWhileSelectCategory = ValueNotifier<bool>(false);
   final localApi = ValueNotifier<bool>(false);
+  final categories = ValueNotifier<bool>(true);
   late final Listenable all = Listenable.merge([
     volume,
     stateIndicator,
@@ -78,6 +79,7 @@ class DatabaseStreamerService {
     justAudioPrefetch,
     dynamicWindowColor,
     originalImageSizeForCoverView,
+    categories
   ]);
 
   Future<void> reload() async {
@@ -133,6 +135,7 @@ class DatabaseStreamerService {
       false,
     );
     localApi.value = _get(DatabaseKeys.localApi, false);
+    categories.value = _get(DatabaseKeys.playlistCategories, true);
   }
 
   Future<void> reset() async {
@@ -150,7 +153,7 @@ class DatabaseStreamerService {
     void bind<T>(ValueNotifier<T> notifier, DatabaseKeys key) async {
       notifier.addListener(() async {
         // print("Saving ${key.value} - ${notifier.value}");
-        await Database.put(key.value, notifier.value);
+        Database.put(key.value, notifier.value);
       });
     }
 
@@ -187,6 +190,8 @@ class DatabaseStreamerService {
       DatabaseKeys.originalImageSizeCoverView,
     );
     bind(localApi, DatabaseKeys.localApi);
+    bind(categories, DatabaseKeys.playlistCategories);
+    bind(playerBackend, DatabaseKeys.playerBackend);
   }
 
   void _attachListeners() {
@@ -208,13 +213,13 @@ class DatabaseSaver {
 
   void init() async {
     _trackListener = () async {
-      await saveLastTrack();
+      saveLastTrack();
     };
     _playlistListener = () async {
       if (Player.player.shuffleModeNotifier.value == true) {
         return;
       }
-      await updateDatabasePlaylist();
+      updateDatabasePlaylist();
     };
 
     Player.player.playlistNotifier.addListener(_playlistListener);
@@ -244,7 +249,7 @@ class DatabaseSaver {
     );
     Map play = await Isolate.run(() => serializePlaylist(pl));
     DatabaseStreamerService().lastPlaylist.value = play;
-    await AppDatabase().saveTracks(Player.player.playlist);
+    AppDatabase().saveTracks(Player.player.playlist);
   }
 }
 

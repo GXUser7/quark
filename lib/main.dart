@@ -1,6 +1,7 @@
 // Flutter & Dart
 import 'dart:io';
 import 'dart:async';
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 // Additional packages
@@ -13,7 +14,8 @@ import 'package:quark/services/database/library_engine.dart';
 import 'package:quark/services/database/listen_logger.dart';
 import 'package:quark/services/dynamic_window_color_linux.dart';
 import 'package:quark/services/local_api/local_api.dart';
-import 'package:quark/services/ytmusic_services.dart';
+import 'package:quark/widgets/drag_drop.dart';
+import 'package:quark/widgets/ytmusic_playlist_widget.dart';
 
 // Local files
 import '/objects/track.dart';
@@ -23,7 +25,7 @@ import '/objects/playlist.dart';
 import '/playlist_page_router.dart';
 import '/services/player/player.dart';
 import 'services/database/settings_engine.dart';
-import '/services/yandex_music_singleton.dart';
+import 'services/yandex_music/yandex_music_singleton.dart';
 import '/services/native_controls/native_control.dart';
 import '/widgets/yandex_music_integration/yandex_login.dart';
 import '/widgets/yandex_music_integration/yandex_playlists_widget.dart';
@@ -39,10 +41,11 @@ void main() async {
 
   await Database.init();
   await DatabaseStreamerService().init();
+  print(DatabaseStreamerService().playerBackend.value);
   Player.player.init(
     backend: DatabaseStreamerService().playerBackend.value == "standart"
         ? PlayerBackend.audioPlayers
-        : null,
+        : PlayerBackend.justAudioMediaKit,
   );
   NativeControl().init();
   AudioServiceMpris.registerWith();
@@ -78,6 +81,8 @@ class _MainPageState extends State<MainPage> {
   bool loginView = false;
   bool playlistView = false;
   bool settingsView = false;
+  bool dragAndDropView = false;
+  List<XFile> _cookieFiles = [];
   PlayerPlaylist? lastPlaylist;
   final log = Logger('MainPage');
   bool hasLatestPlaylist = false;
@@ -120,6 +125,12 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
+  Future<void> closeCookieDragAndDrop() async {
+    setState(() {
+      dragAndDropView = false;
+    });
+  }
+
   /// Reacting on close playlist button
   Future<void> closePlaylist([bool? openPlaylists]) async {
     setState(() {
@@ -139,7 +150,7 @@ class _MainPageState extends State<MainPage> {
     lastPlaylist = playlist;
 
     Player.player.updatePlaylistInfo(PlaylistInfo.fromPlayerPlaylist(playlist));
-    await Player.player.updatePlaylist(playlist.tracks);
+    Player.player.updatePlaylist(playlist.tracks);
     PlayerTrack? foundTrack;
     if (lastTrackPath != null) {
       for (final track in playlist.tracks) {
@@ -151,12 +162,12 @@ class _MainPageState extends State<MainPage> {
     }
     final trackToPlay = foundTrack ?? playlist.tracks[0];
 
-    await Player.player.pause();
-    await Player.player.playCustom(trackToPlay);
+    Player.player.pause();
+    Player.player.playCustom(trackToPlay);
     if (foundTrack != null) {
       if (Duration(seconds: DatabaseStreamerService().lastTrackPosition.value) <
           Player.player.durationNotifier.value) {
-        await Player.player.seek(
+        Player.player.seek(
           Duration(seconds: DatabaseStreamerService().lastTrackPosition.value),
         );
       }
@@ -232,37 +243,26 @@ class _MainPageState extends State<MainPage> {
     }
   }
 
-  Future<void> _onYTMusicPlaylistSelected(String playlistId) async {
+  Future<void> _onYTMusicPlaylistSelected(PlayerPlaylist playlist) async {
     try {
-      final yt = YTMusicAPI();
-      final response = await yt.getPlaylist(playlistId);
-
-      final tracks = response.allTracks
-          .map((yt) => YTMusicTrack.fromApiTrack(yt.raw))
-          .toList();
-
       Player.player.updatePlaylistInfo(
         PlaylistInfo(
           kind: 0,
           source: PlaylistSource.youtube,
-          name: response.title ?? 'YouTube Music',
+          name: playlist.name,
         ),
       );
-      await Player.player.updatePlaylist(tracks);
+      Player.player.updatePlaylist(playlist.tracks);
 
-      if (tracks.isNotEmpty) {
-        await Player.player.playCustom(tracks.first);
+      if (playlist.tracks.isNotEmpty) {
+        Player.player.playCustom(playlist.tracks.first);
       }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
 
-        Navigator.push(
-          context,
-          CupertinoPageRoute(builder: (_) => PlaylistPage()),
-        );
-      });
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        CupertinoPageRoute(builder: (_) => PlaylistPage()),
+      );
     } catch (e) {
       Logger('MainPage').severe('YTMusic playlist error: $e');
     }
@@ -448,10 +448,12 @@ class _MainPageState extends State<MainPage> {
                   // YTMUSIC
                   const SizedBox(height: 12.5),
                   _mainPageButton(
-                    () async => await _onYTMusicPlaylistSelected(
-                      'OLAK5uy_nNutR-J9j_crO8GqSKSbEF-fQVGnPVBzE',
-                    ),
-                    'Youtube Music(Alpha)',
+                    () async => {
+                      setState(() {
+                        dragAndDropView = true;
+                      }),
+                    },
+                    'Youtube Music',
                   ),
                 ],
               ),
@@ -525,6 +527,48 @@ class _MainPageState extends State<MainPage> {
           ),
           AnimatedSwitcher(
             duration: Duration(milliseconds: 300),
+            child: dragAndDropView
+                ? GestureDetector(
+                    onTap: () => setState(() => dragAndDropView = false),
+                    child: Container(
+                      color: Colors.black.withAlpha(25),
+                      child: Stack(
+                        children: [
+                          GestureDetector(
+                            onTap: () {},
+                            child: _cookieFiles.isEmpty
+                                ? GlassDropZone(
+                                    closeView: closeCookieDragAndDrop,
+                                    onFileDropped: (files) {
+                                      setState(() => _cookieFiles = files);
+                                    },
+                                  )
+                                : YTMusicPlaylists(
+                                    cookieFile: _cookieFiles.first,
+                                    closeView: closeCookieDragAndDrop,
+                                    playlistRouter: _onYTMusicPlaylistSelected,
+                                  ),
+                          ),
+                          Positioned(
+                            right: Platform.isAndroid ? 15 : 5,
+                            top: Platform.isAndroid ? 15 : 5,
+                            child: IconButton(
+                              onPressed: () => setState(() {
+                                dragAndDropView = false;
+                                _cookieFiles = []; // close when close
+                              }),
+                              icon: Icon(Icons.close, color: Colors.white70),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : SizedBox.shrink(),
+          ),
+
+          AnimatedSwitcher(
+            duration: Duration(milliseconds: 300),
             child: settingsView
                 ? GestureDetector(
                     onTap: () => setState(() => settingsView = false),
@@ -553,7 +597,8 @@ class _MainPageState extends State<MainPage> {
           ),
           if (playlistView == false &&
               loginView == false &&
-              settingsView == false)
+              settingsView == false &&
+              dragAndDropView == false)
             Positioned(
               right: Platform.isAndroid ? 15 : 5,
               top: Platform.isAndroid ? 30 : 5,

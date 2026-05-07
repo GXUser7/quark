@@ -12,7 +12,7 @@ import 'package:quark/objects/track.dart';
 import 'package:logging/logging.dart';
 import 'package:quark/services/database/database.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:quark/services/yandex_music_singleton.dart';
+import 'package:quark/services/yandex_music/yandex_music_singleton.dart';
 import 'package:quark/widgets/players_widgets/main_player.dart';
 import 'package:quark/widgets/players_widgets/slider_widget.dart';
 import 'package:quark/widgets/playlist/playlist_widget.dart';
