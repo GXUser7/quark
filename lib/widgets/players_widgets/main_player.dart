@@ -1133,30 +1133,30 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                         Icons.settings,
                                       ),
 
-                                      animatedExpandButton(() async {
-                                        final playlists = await AppDatabase()
-                                            .getAllPlaylistsWithTracks();
+                                      // animatedExpandButton(() async {
+                                      //   final playlists = await AppDatabase()
+                                      //       .getAllPlaylistsWithTracks();
 
-                                        Navigator.push(
-                                          context,
-                                          CupertinoPageRoute(
-                                            builder: (_) {
-                                              return LocalPlaylists(
-                                                closeView: () {},
-                                                playlists: playlists
-                                                    .map(
-                                                      (e) =>
-                                                          LocalPlaylistAbout.getFromDatabase(
-                                                            e,
-                                                          ),
-                                                    )
-                                                    .toList(),
-                                                playlistRouter: (_) {},
-                                              );
-                                            },
-                                          ),
-                                        );
-                                      }, Icons.sports_golf),
+                                      //   Navigator.push(
+                                      //     context,
+                                      //     CupertinoPageRoute(
+                                      //       builder: (_) {
+                                      //         return LocalPlaylists(
+                                      //           closeView: () {},
+                                      //           playlists: playlists
+                                      //               .map(
+                                      //                 (e) =>
+                                      //                     LocalPlaylistAbout.getFromDatabase(
+                                      //                       e,
+                                      //                     ),
+                                      //               )
+                                      //               .toList(),
+                                      //           playlistRouter: (_) {},
+                                      //         );
+                                      //       },
+                                      //     ),
+                                      //   );
+                                      // }, Icons.sports_golf),
                                       animatedExpandButton(() async {
                                         Navigator.pop(context);
                                       }, Icons.exit_to_app),
