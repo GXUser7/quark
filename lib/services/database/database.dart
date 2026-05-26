@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:flutter/material.dart';
+
 import 'settings_engine.dart';
 import 'package:logging/logging.dart';
 import 'package:flutter/foundation.dart';
@@ -21,6 +23,9 @@ class DatabaseStreamerService {
     _attachListeners();
     Logger('DatabaseStreamerService').fine('Inited');
   }
+
+  final ValueNotifier<Locale?> _appLocale = ValueNotifier<Locale?>(null);
+  ValueNotifier<Locale?> get appLocale => _appLocale;
 
   final volume = ValueNotifier<double>(0.7);
   final stateIndicator = ValueNotifier<bool>(true);
@@ -60,7 +65,6 @@ class DatabaseStreamerService {
   final spotifySearch = ValueNotifier<bool>(true);
   final spotifyQuality = ValueNotifier<String>('lossless');
   final spotifySourcePriority = ValueNotifier<String>('gdstudio');
-
 
   late final Listenable all = Listenable.merge([
     volume,
@@ -141,9 +145,6 @@ class DatabaseStreamerService {
     final spq = await Database.get(DatabaseKeys.spotifyQuality.value);
     final spp = await Database.get(DatabaseKeys.spotifySourcePriority.value);
 
-    
-
-
     gradientMode.value = gm ?? false;
     lastPlaylistState.value = lps ?? false;
     yandexMusicPlaylists.value = ymp2;
@@ -188,6 +189,12 @@ class DatabaseStreamerService {
     await Database.clear();
     await reload();
   }
+
+  Future<void> setAppLocale(Locale locale) async {
+    _appLocale.value = locale;
+  }
+
+  Locale? getAppLocale() => _appLocale.value;
 
   void _attachSavers() {
     if (!Database.isInited) {

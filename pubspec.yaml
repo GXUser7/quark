@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter 
   dio: ^5.9.0
   hive: ^2.2.3
   path: ^1.9.1
@@ -76,9 +78,18 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   build_runner: ^2.13.1
   drift_dev: ^2.32.1
+  flutter_gen_runner: ^5.14.1
+
+
+flutter_gen:
+  output: lib/generated/
+  integrations:
+    flutter_localizations: true
+    
 
 
 flutter:
+  generate: true
   uses-material-design: true
   assets:
     - assets/icon512.png

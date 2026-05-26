@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 // Additional packages
 import 'package:hive/hive.dart';
@@ -47,6 +48,7 @@ import '/widgets/yandex_music_integration/yandex_playlists_widget.dart';
 import '/widgets/auth.dart';
 import 'package:quark/services/auth_services.dart';
 import 'package:quark/widgets/multi_search.dart';
+import 'package:quark/l10n/app_localizations.dart';
 
 // TODO: fix bug while closing playtlist with iconbutton then if playlist was opened by mouseArea it wont close
 // TODO: Lister logger migration
@@ -71,9 +73,24 @@ class Quark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: const MainPage(),
-      debugShowCheckedModeBanner: false,
+    return ValueListenableBuilder<Locale?>(
+      valueListenable: DatabaseStreamerService().appLocale,
+      builder: (context, savedLocale, child) {
+        return MaterialApp(
+          home: const MainPage(),
+          debugShowCheckedModeBanner: false,
+
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+
+          locale: savedLocale ?? const Locale('ru'),
+        );
+      },
     );
   }
 }
@@ -133,7 +150,7 @@ class _MainPageState extends State<MainPage> {
             PlayerPlaylist(
               kind: 0,
               ownerUid: 0,
-              name: "Local",
+              name: AppLocalizations.of(context)!.localeName,
               tracks: result,
               source: PlaylistSource.local,
             ),
@@ -359,7 +376,9 @@ class _MainPageState extends State<MainPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка загрузки плейлиста: ${e.toString()}'),
+            content: Text(
+              AppLocalizations.of(context)!.playlistError(e.toString()),
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -393,7 +412,9 @@ class _MainPageState extends State<MainPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка загрузки плейлиста: ${e.toString()}'),
+            content: Text(
+              AppLocalizations.of(context)!.playlistError(e.toString()),
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -544,6 +565,7 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final size = MediaQuery.of(context).size;
     return Material(
       child: Stack(
@@ -559,8 +581,8 @@ class _MainPageState extends State<MainPage> {
                 children: [
                   Image.asset('assets/icon512.png', height: 150, width: 150),
                   const SizedBox(height: 15),
-                  const Text(
-                    'quark: where sound begins',
+                  Text(
+                    l10n.appTitle,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 28,
@@ -570,14 +592,13 @@ class _MainPageState extends State<MainPage> {
                     ),
                   ),
                   const SizedBox(height: 15),
-                  const SizedBox(
+                  SizedBox(
                     width: 400,
                     child: Text(
-                      'Select the folder with tracks. \nYou can also link your streaming account to use it.',
+                      l10n.selectFolderHint,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white,
-
                         fontSize: 16,
                         decoration: TextDecoration.none,
                         fontWeight: FontWeight.normal,
@@ -596,43 +617,28 @@ class _MainPageState extends State<MainPage> {
                       //       context: context,
                       //       builder: (ctx) => AlertDialog(
                       //         backgroundColor: const Color(0xFF1C1C1E),
-                      //         title: const Text(
-                      //           'Delete all playlists?',
-                      //           style: TextStyle(color: Colors.white),
-                      //         ),
-                      //         content: const Text(
-                      //           'This will permanently delete all local playlists and their tracks.',
-                      //           style: TextStyle(color: Colors.white70),
-                      //         ),
+                      //         title: Text(l10n.deleteAllPlaylists, style: TextStyle(color: Colors.white)),
+                      //         content: Text(l10n.deleteAllPlaylistsDesc, style: TextStyle(color: Colors.white70)),
                       //         actions: [
                       //           TextButton(
                       //             onPressed: () => Navigator.pop(ctx, false),
-                      //             child: const Text(
-                      //               'Cancel',
-                      //               style: TextStyle(color: Colors.white54),
-                      //             ),
+                      //             child: Text(l10n.cancel, style: TextStyle(color: Colors.white54)),
                       //           ),
                       //           TextButton(
                       //             onPressed: () => Navigator.pop(ctx, true),
-                      //             child: const Text(
-                      //               'Delete',
-                      //               style: TextStyle(color: Colors.redAccent),
-                      //             ),
+                      //             child: Text(l10n.delete, style: TextStyle(color: Colors.redAccent)),
                       //           ),
                       //         ],
                       //       ),
                       //     );
-
                       //     if (confirm != true) return;
-
-                      //     final raw = await AppDatabase()
-                      //         .getAllPlaylistsWithTracks();
+                      //     final raw = await AppDatabase().getAllPlaylistsWithTracks();
                       //     for (final p in raw) {
                       //       await AppDatabase().deletePlaylist(p.playlist.id);
                       //     }
                       //     setState(() {});
                       //   },
-                      //   label: 'Delete all',
+                      //   label: l10n.deleteAll,
                       //   icon: Icons.delete_forever,
                       //   color: const Color(0xFF8B0000),
                       // ),
@@ -641,7 +647,7 @@ class _MainPageState extends State<MainPage> {
                           children: [
                             GnomeTile(
                               onTap: () async => playlistRestore(),
-                              label: "Restore playlist",
+                              label: l10n.restorePlaylist,
                               icon: Icons.restore_rounded,
                             ),
                           ],
@@ -649,13 +655,13 @@ class _MainPageState extends State<MainPage> {
 
                       GnomeTile(
                         onTap: () async => await {pickFolder()},
-                        label: "Pick folder",
+                        label: l10n.pickFolder,
                         icon: Icons.folder,
                       ),
 
                       GnomeTile(
                         onTap: () async => await ymUpdate(),
-                        label: "Yandex Music",
+                        label: l10n.yandexMusic,
                         iconWidget: Image.asset(
                           'assets/ym_w_alt.png',
                           width: 30,
@@ -669,7 +675,7 @@ class _MainPageState extends State<MainPage> {
                             dragAndDropView = true;
                           }),
                         },
-                        label: "YouTube Music",
+                        label: l10n.youtubeMusic,
                         iconWidget: Image.asset(
                           'assets/y_w_alt.png',
                           width: 30,
@@ -679,10 +685,6 @@ class _MainPageState extends State<MainPage> {
 
                       // VKMUSIC
                       GnomeTile(
-                        // onTap: () => AuthService().loginVk(
-                        //   "+79876081986",
-                        //   "LBSAgKZ64d7piGzybAaJgP",
-                        // ),
                         onTap: () async => {
                           await Navigator.push(
                             context,
@@ -696,14 +698,10 @@ class _MainPageState extends State<MainPage> {
                                   }
                                 },
                               ),
-                              // builder: (_) => VkMusicPlaylists(
-                              //   closeView: () => Navigator.pop(context),
-                              //   playlistRouter: (playlist) => _onVkMusicPlaylistSelected(playlist),
-                              // ),
                             ),
                           ),
                         },
-                        label: "VK Music",
+                        label: l10n.vkMusic,
                         iconWidget: Image.asset(
                           'assets/vk_w_alt.png',
                           width: 30,
@@ -714,7 +712,7 @@ class _MainPageState extends State<MainPage> {
                         onTap: () async {
                           setState(() => soundCloudView = true);
                         },
-                        label: "Sound Cloud",
+                        label: l10n.soundCloud,
                         iconWidget: Image.asset(
                           'assets/soundcloud_w.png',
                           width: 37,
@@ -739,7 +737,7 @@ class _MainPageState extends State<MainPage> {
                           );
                           _playlistsKey.currentState?.reload();
                         },
-                        label: "Search",
+                        label: l10n.search,
                         icon: Icons.search,
                       ),
                     ],
@@ -758,11 +756,7 @@ class _MainPageState extends State<MainPage> {
             duration: Duration(milliseconds: 300),
             child: loginView
                 ? GestureDetector(
-                    onTap: () => setState(() {
-                      // if (Platform.isLinux) {
-                      // loginView = false;
-                      // }
-                    }),
+                    onTap: () => setState(() {}),
                     child: Container(
                       key: ValueKey('login'),
                       color: Colors.black.withAlpha(25),
@@ -800,7 +794,6 @@ class _MainPageState extends State<MainPage> {
                             child: YandexPlaylists(
                               closeView: closePlaylist,
                               yandexMusic: yandexMusic,
-                              // playlists: userPlaylists,
                               playlistRouter: playlistRoute,
                             ),
                           ),
@@ -937,7 +930,7 @@ class _MainPageState extends State<MainPage> {
                             child: IconButton(
                               onPressed: () => setState(() {
                                 dragAndDropView = false;
-                                _cookieFiles = []; // close when close
+                                _cookieFiles = [];
                               }),
                               icon: Icon(Icons.close, color: Colors.white70),
                             ),
