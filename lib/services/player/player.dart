@@ -12,6 +12,7 @@ import 'package:just_audio/just_audio.dart' as just_audio;
 import 'package:quark/services/database/database.dart';
 import 'package:quark/services/player/net_player.dart';
 import 'package:quark/services/soundcloud_services.dart';
+import 'package:quark/services/spotify_services.dart';
 import 'package:quark/services/yandex_music_singleton.dart';
 
 enum ShuffleMode {
@@ -803,6 +804,8 @@ class Player {
   Future<void> playCustom(PlayerTrack track) async {
     PlayerTrack resolvedTrack = track;
 
+    // Resolve dynamic stream URLs for non-local sources.
+    // SoundCloud: "sc:<id>" placeholder → real HTTPS stream.
     if (resolvedTrack.filepath.startsWith('sc:')) {
       final scId = int.tryParse(resolvedTrack.filepath.replaceFirst('sc:', ''));
       if (scId != null) {
@@ -818,6 +821,21 @@ class Player {
             coverByted: resolvedTrack.coverByted,
           );
         }
+      }
+    } else if (resolvedTrack is SpotifyTrack) {
+      final sTrack = resolvedTrack;
+      final url = await SpotifyService().getStreamUrl(sTrack);
+      if (url != null && url.isNotEmpty) {
+        sTrack.streamUrl = url;
+        resolvedTrack = LocalTrack(
+          title: sTrack.title,
+          artists: sTrack.artists,
+          albums: sTrack.albums,
+          filepath: url,
+          coverType: sTrack.coverType,
+          cover: sTrack.cover,
+          coverByted: sTrack.coverByted,
+        );
       }
     }
 

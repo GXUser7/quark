@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:quark/services/playlist_sync_services.dart';
 import 'database//database.dart';
 import 'database/settings_engine.dart';
@@ -20,13 +19,13 @@ class AuthService {
     await loadTokens();
   }
 
-  static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-    iOptions: IOSOptions(
-      accessibility: KeychainAccessibility.first_unlock_this_device,
-      synchronizable: false,
-    ),
-  );
+  // static const _storage = FlutterSecureStorage(
+  //   aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  //   iOptions: IOSOptions(
+  //     accessibility: KeychainAccessibility.first_unlock_this_device,
+  //     synchronizable: false,
+  //   ),
+  // );
 
   final db = DatabaseStreamerService();
 

@@ -26,6 +26,10 @@ Future<Map<String, dynamic>> serializePlaylist(PlayerPlaylist playlist) async {
       tracks.add({'source': 'yandex_music', 'data': element.track.raw});
     } else if (element is LocalTrack) {
       tracks.add({'source': 'local', 'data': serializedLocalTrack(element)});
+    } else if (element is YTMusicTrack) {
+      tracks.add({'source': 'ytmusic', 'data': serializedYTMusicTrack(element)});
+    } else if (element is SpotifyTrack) {
+      tracks.add({'source': 'spotify', 'data': serializedSpotifyTrack(element)});
     }
   }
 
@@ -79,6 +83,10 @@ Future<PlayerPlaylist> deserializePlaylist(Map playlist) async {
       Track track = Track(element['data']);
       final YandexMusicTrack out = YandexMusicTrack.fromYMTrack(track);
       tracks.add(out);
+    } else if (element['source'] == 'ytmusic') {
+      tracks.add(await deserializedYTMusicTrack(element['data']));
+    } else if (element['source'] == 'spotify') {
+      tracks.add(await deserializedSpotifyTrack(element['data']));
     }
   }
 
@@ -86,6 +94,9 @@ Future<PlayerPlaylist> deserializePlaylist(Map playlist) async {
     'yandex_music' => PlaylistSource.yandexMusic,
     'local' => PlaylistSource.local,
     'spotify' => PlaylistSource.spotify,
+    'ytmusic' => PlaylistSource.ytmusic,
+    'vkmusic' => PlaylistSource.vkmusic,
+    'soundcloud' => PlaylistSource.soundcloud,
     _ => PlaylistSource.local,
   };
 

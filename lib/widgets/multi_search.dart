@@ -10,10 +10,12 @@ import 'package:quark/services/database/library_engine.dart' as db;
 import 'package:quark/services/soundcloud_services.dart';
 import 'package:quark/services/yandex_music_singleton.dart';
 import 'package:yandex_music/yandex_music.dart';
+import 'package:quark/services/spotify_services.dart';
+import 'package:quark/services/database/database.dart';
 
 const _kBaseUrl = 'https://quarkaudio.ru';
 
-enum _MusicService { yandex, youtube, vk, local, soundcloud }
+enum _MusicService { yandex, youtube, vk, local, soundcloud, spotify }
 
 class MusicSearchWidget extends StatefulWidget {
   final Future<void> Function(
@@ -98,6 +100,7 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
         _MusicService.vk => await _searchVK(query),
         _MusicService.local => await _searchLocal(query),
         _MusicService.soundcloud => await _searchSoundCloud(query),
+        _MusicService.spotify => await _searchSpotify(query),
       };
       if (mounted) setState(() => _results = results);
     } catch (e) {
@@ -148,6 +151,10 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
   Future<List<PlayerTrack>> _searchSoundCloud(String query) async {
     final tracks = await SoundCloudService().searchTracks(query, limit: 20);
     return tracks.map((t) => t.toPlayerTrack()).toList();
+  }
+
+  Future<List<PlayerTrack>> _searchSpotify(String query) async {
+    return await SpotifyService().search(query, limit: 20);
   }
 
   Future<List<PlayerTrack>> _searchYT(String query) async {
@@ -410,6 +417,18 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
               _results = [];
             }),
           ),
+          if (DatabaseStreamerService().spotifySearch.value) ...[
+            const SizedBox(width: 8),
+            _ServiceChip(
+              label: 'Spotify',
+              selected: _service == _MusicService.spotify,
+              color: const Color(0xFF1DB954),
+              onTap: () => setState(() {
+                _service = _MusicService.spotify;
+                _results = [];
+              }),
+            ),
+          ],
         ],
       ),
     );

@@ -192,12 +192,32 @@ class NativeControl {
     } else {
       try {
         Duration duration = Duration.zero;
+        final cover = customImage ?? track.cover;
+        final artUri = () {
+          if (cover.isEmpty || cover == 'none') {
+            return '';
+          }
+          if (cover.startsWith('http://') || cover.startsWith('https://')) {
+            return cover.replaceAll('%%', '300x300');
+          }
+          // Fix malformed prefixes like "https//" or "http//"
+          if (cover.startsWith('https//')) {
+            return 'https://' +
+                cover.substring('https//'.length).replaceAll('%%', '300x300');
+          }
+          if (cover.startsWith('http//')) {
+            return 'http://' +
+                cover.substring('http//'.length).replaceAll('%%', '300x300');
+          }
+          return 'https://${cover.replaceAll('%%', '300x300')}';
+        }();
+
         await (control as MyAudioHandler).setPlayback(
           track.title,
           track.artists.join(','),
           track.albums.join(','),
           duration,
-          customImage ?? 'https://${track.cover.replaceAll('%%', '300x300')}',
+          artUri.isNotEmpty ? artUri : 'about:blank',
           '#TODO',
         );
       } catch (e) {

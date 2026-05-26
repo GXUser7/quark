@@ -57,6 +57,9 @@ class DatabaseStreamerService {
   final isLoggedIn = ValueNotifier<bool>(false);
   final scOauthToken = ValueNotifier<String>('');
   final scProfileUrl = ValueNotifier<String>('');
+  final spotifySearch = ValueNotifier<bool>(true);
+  final spotifyQuality = ValueNotifier<String>('lossless');
+  final spotifySourcePriority = ValueNotifier<String>('gdstudio');
 
 
   late final Listenable all = Listenable.merge([
@@ -88,7 +91,10 @@ class DatabaseStreamerService {
     vkMusicToken,
     isLoggedIn,
     scOauthToken,
-    scProfileUrl
+    scProfileUrl,
+    spotifySearch,
+    spotifyQuality,
+    spotifySourcePriority
   ]);
 
   Future<void> reload() async {
@@ -131,6 +137,9 @@ class DatabaseStreamerService {
     final ili = await Database.get(DatabaseKeys.isLoggedIn.value);
     final sco = await Database.get(DatabaseKeys.scOauthToken.value);
     final scu = await Database.get(DatabaseKeys.scProfileUrl.value);
+    final sps = await Database.get(DatabaseKeys.spotifySearch.value);
+    final spq = await Database.get(DatabaseKeys.spotifyQuality.value);
+    final spp = await Database.get(DatabaseKeys.spotifySourcePriority.value);
 
     
 
@@ -168,6 +177,9 @@ class DatabaseStreamerService {
     isLoggedIn.value = ili ?? false;
     scOauthToken.value = sco ?? '';
     scProfileUrl.value = scu ?? '';
+    spotifySearch.value = sps ?? true;
+    spotifyQuality.value = spq ?? 'lossless';
+    spotifySourcePriority.value = spp ?? 'gdstudio';
 
     await Player.player.setVolume(Platform.isAndroid ? 1.0 : volume.value);
   }
@@ -229,6 +241,9 @@ class DatabaseStreamerService {
     bind(isLoggedIn, DatabaseKeys.isLoggedIn);
     bind(scOauthToken, DatabaseKeys.scOauthToken);
     bind(scProfileUrl, DatabaseKeys.scProfileUrl);
+    bind(spotifySearch, DatabaseKeys.spotifySearch);
+    bind(spotifyQuality, DatabaseKeys.spotifyQuality);
+    bind(spotifySourcePriority, DatabaseKeys.spotifySourcePriority);
   }
 
   void _attachListeners() {
