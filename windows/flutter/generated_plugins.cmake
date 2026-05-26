@@ -4,6 +4,9 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
+  desktop_drop
+  flutter_inappwebview_windows
+  flutter_secure_storage_windows
   just_audio_windows
   media_kit_libs_windows_audio
   media_kit_libs_windows_video
@@ -12,6 +15,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  jni
   smtc_windows
 )
 

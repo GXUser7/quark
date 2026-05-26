@@ -76,9 +76,6 @@ abstract class DynamicWindowColor {
     });
     nowColor = colors;
     Logger("DWC").fine("Changed Color");
-    // Logger(
-    //   "DynamicWindowColor_Linux",
-    // ).info("A request to change the theme color has been sent.");
   }
 
   static void updateTitle(String title) async {

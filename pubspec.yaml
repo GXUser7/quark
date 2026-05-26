@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 0.2.3
 
 environment:
-  sdk: ^3.8.0
+  sdk: ^3.10.0
 
 dependencies:
   flutter:
@@ -17,7 +17,7 @@ dependencies:
   animations: ^2.1.1
   url_launcher: ^6.3.2
   audioplayers: ^6.5.1
-  file_picker: ^10.3.3
+  file_picker: ^8.2.0
   smtc_windows: ^1.1.0
   yandex_music: ^1.2.2  
   path_provider: ^2.1.5
@@ -27,7 +27,7 @@ dependencies:
   interactive_slider: ^0.5.1
   audio_service_mpris: ^0.2.0
   # flutter_inappwebview: ^6.2.0-beta.2
-  # flutter_inappwebview: ^6.1.5
+  flutter_inappwebview: ^6.1.5
   audio_metadata_reader: ^1.4.2
   material_symbols_icons: ^4.2892.0
   # window_manager: ^0.5.1
@@ -48,6 +48,15 @@ dependencies:
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
   media_kit_libs_video: ^1.0.7
+  desktop_drop: ^0.7.1
+  shared_preferences: ^2.5.5
+  cross_file: ^0.3.5+2
+  libadwaita: ^2.0.2
+  nativeshell: ^0.1.16
+  flutter_secure_storage: ^10.1.0
+  soundcloud_explode_dart: ^1.1.0
+  pin_code_fields: ^9.3.0
+  signals: ^6.3.0
 
 dependency_overrides:
   yandex_music:
@@ -73,5 +82,17 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon512.png
+    - assets/ym_w.png
+    - assets/ym_y.png
+    - assets/youtubeMusic_w.png
+    - assets/vkm_w.png
+    - assets/youtubeMusic_w_alt.png
+    - assets/ym_w_alt.png
+    - assets/vk_w_alt.png
+    - assets/y_w.png
+    - assets/y_w_alt.png
+    - assets/soundcloud_w.png
+    
+
   shaders:
     - shaders/vibe.frag

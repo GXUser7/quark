@@ -36,7 +36,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
   }
 
   void init() async {
-
+    print("INITED01");
   }
 
   @override

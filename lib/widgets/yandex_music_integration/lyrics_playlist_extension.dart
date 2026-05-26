@@ -126,23 +126,20 @@ class _TrackInfoView extends State<LyricsView> {
                     maxWidth: MediaQuery.of(context).size.width,
                     maxHeight: MediaQuery.of(context).size.height,
                     alignment: Alignment.centerLeft,
-                    child: ColorFiltered(
-                      colorFilter: ColorFilter.mode(
-                        Colors.black.withOpacity(0.5),
-                        BlendMode.darken,
-                      ),
-                      child: CachedBlurredNetworkImage(
-                        coverUri:
-                            'https://${Player.player.nowPlayingTrack.cover.replaceAll('%%', '300x300')}',
-                        width: MediaQuery.of(context).size.width,
-                        height: MediaQuery.of(context).size.height,
-                        fit: BoxFit.cover,
-                      ),
+                    child: CachedBlurredNetworkImage(
+                      coverUri:
+                          'https://${Player.player.nowPlayingTrack.cover.replaceAll('%%', '300x300')}',
+                      width: MediaQuery.of(context).size.width,
+                      height: MediaQuery.of(context).size.height,
+                      fit: BoxFit.cover,
                     ),
                   ),
                 ),
               ),
 
+              Positioned.fill(
+                child: ColoredBox(color: Colors.black.withOpacity(0.5)),
+              ),
               Container(
                 width: 400,
                 height: MediaQuery.of(context).size.height,

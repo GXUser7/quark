@@ -25,6 +25,7 @@ enum DatabaseKeys {
   originalImageSizeCoverView('original_image_size_cover_view'),
   playerBackend('player_backend'),
   justAudioPrefetch('just_audio_player_prefetch'),
+  changePlaylistWhileSelectCategory('category_playlist_change'),
 
   /// ```Boolean```
   /// recursiveFilesAdding
@@ -112,11 +113,37 @@ enum DatabaseKeys {
 
   /// ```bool```
   /// Preload yandexMusic when player starts
-  yandexMusicPreload('yandex_music_preload');
+  yandexMusicPreload('yandex_music_preload'),
+
+  /// ```String```
+  /// VK account access token
+  accessToken('accessToken'),
+
+   /// ```String```
+  /// VK account access token
+  refreshToken('refreshToken'),
+
+  /// ```String```
+  /// VK account access token
+  vkMusicToken('vkMusicToken'),
+
+  /// ```bool```
+  /// VK account access token
+  isLoggedIn('isLoggedIn'),
+
+  /// ```String```
+  ///  sc oauth token
+  scOauthToken('scOauthToken'),
+
+  /// ```String```
+  /// VK account access token
+  scProfileUrl('scProfileUrl');
+  
 
   final String value;
   const DatabaseKeys(this.value);
 }
+
 
 class Database {
   static Box? _box;

@@ -1,9 +1,8 @@
 import 'package:quark/objects/track.dart';
 import 'package:yandex_music/src/objects/track.dart';
 
-enum PlaylistSource { yandexMusic, local, spotify }
+enum PlaylistSource { yandexMusic, local, spotify, ytmusic, vkmusic, soundcloud}
 
-// #TODO: create a LikedPlaylist variable for the playlist
 class PlayerPlaylist {
   final int kind;
   final String name;
@@ -34,6 +33,9 @@ Future<Map<String, dynamic>> serializePlaylist(PlayerPlaylist playlist) async {
     PlaylistSource.yandexMusic => 'yandex_music',
     PlaylistSource.local => 'local',
     PlaylistSource.spotify => 'spotify',
+    PlaylistSource.ytmusic => 'ytmusic',
+    PlaylistSource.vkmusic => 'vkmusic',
+    PlaylistSource.soundcloud => 'soundcloud'
   };
 
   return {

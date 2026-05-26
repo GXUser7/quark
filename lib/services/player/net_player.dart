@@ -1,4 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:pool/pool.dart';
+import 'package:quark/services/soundcloud_services.dart';
+import 'package:quark/services/ytmusic_services.dart';
 
 import 'player.dart';
 import 'package:async/async.dart';
@@ -7,6 +11,7 @@ import '../database/settings_engine.dart';
 import 'package:quark/objects/track.dart';
 import 'package:yandex_music/yandex_music.dart';
 import 'package:quark/services/database/database.dart';
+import 'package:quark/services/ytmusic.dart' as ytm;
 
 /// Controls playback and caching of non-local and non-cached tracks
 
@@ -28,22 +33,8 @@ class NetConductor {
 
   CancelableOperation? _operation;
 
-  List<String> caching = [];
+  final Set<String> caching = {};
   PlayerTrack? _lastTrack;
-
-  /// Returns a list of files that are not cached on disk
-  // static Future<List<PlayerTrack>> checkCacheExists(
-  //   List<PlayerTrack> tracks,
-  // ) async {
-  //   final List<PlayerTrack> result = [];
-  //   for (PlayerTrack track in tracks) {
-  //     if (!await File(track.filepath).exists()) {
-  //       result.add(track);
-  //     }
-  //   }
-
-  //   return result;
-  // }
 
   void init(Player player, YandexMusic yandex) async {
     if (_isInitialized) {
@@ -78,12 +69,38 @@ class NetConductor {
 
     await _operation?.cancel();
 
+    // yandex music
     if (track is YandexMusicTrack && !await File(track.filepath).exists()) {
+          print('[NetConductor] playing yandex track');
       try {
         _operation = CancelableOperation.fromFuture(_getLinkAndPlay(track));
         await _operation!.value;
       } catch (e) {
         Logger('NetConductor').severe('Error: $e');
+        print('[NetConductor] yandex error: $e');
+      }
+    }
+
+    // ytmusic
+    if (track is YTMusicTrack && !await File(track.filepath).exists()) {
+      try {
+        _operation = CancelableOperation.fromFuture(_playYoutube(track));
+        await _operation!.value;
+      } catch (e) {
+        Logger('NetConductor').severe('Error: $e');
+      }
+    }
+    // sc
+    if (track is LocalTrack && track.filepath.startsWith('sc:')) {
+      print('SC playNet url: ${track.filepath}');
+      final scId = int.tryParse(track.filepath.replaceFirst('sc:', ''));
+      if (scId != null) {
+        final url = await SoundCloudService().getStreamUrlWithOAuth(
+          scId,
+        ); // ← не getStreamUrl
+        if (url != null) {
+          await _player.playNetTrack(url, track);
+        }
       }
     }
 
@@ -105,8 +122,35 @@ class NetConductor {
       (track as YandexMusicTrack).track.id,
       quality: downloadQuality,
     );
+
     if (_operation?.isCanceled ?? true) return;
     await _player.playNetTrack(link, track);
+  }
+
+  Future<void> _playYoutube(PlayerTrack track) async {
+    if (_operation?.isCanceled ?? false) return;
+
+    final ytTrack = await YTMusicAPI().getTrack(
+      (track as YTMusicTrack).videoId,
+    );
+
+    String? link = ytTrack.streamUrl;
+
+    if (link == null) return;
+
+    if (_operation?.isCanceled ?? true) return;
+    await _player.playNetTrack(link, track);
+  }
+
+  Future<List<PlayerTrack>> getUncached(List<PlayerTrack> tracks) async {
+    final List<PlayerTrack> result = [];
+    for (PlayerTrack track in tracks) {
+      if (track.filepath.startsWith('http')) continue;
+      if (!await File(track.filepath).exists()) {
+        result.add(track);
+      }
+    }
+    return result;
   }
 
   /// Top function for caching tracks in storage
@@ -129,23 +173,35 @@ class NetConductor {
         );
       }
     }
-    for (PlayerTrack track in tracks) {
-      if (track is! LocalTrack) {
+
+    final pool = Pool(8);
+    final futures = <Future<void>>[];
+    final List<PlayerTrack> unCached = await getUncached(tracks);
+    Logger("NetConductor").info(
+      "Requested caching ${unCached.length} tracks. ${tracks.length - unCached.length} already exists.",
+    );
+    tracks = unCached;
+    final lenght = tracks.length;
+    for (int i = 0; i < lenght; i++) {
+      PlayerTrack track = tracks[i];
+      if (track is YandexMusicTrack) {
         if (caching.contains(track.filepath)) {
           continue;
         }
         final quality = DatabaseStreamerService().yandexMusicQuality.value;
-        AudioQuality downloadQuality = switch (quality) {
-          'lossless' => AudioQuality.lossless,
-          'nq' => AudioQuality.normal,
-          'lq' => AudioQuality.low,
-          'mp3' => AudioQuality.normal,
-          _ => AudioQuality.normal,
-        };
-        await _cacheFileInBackground((track, _yandex, downloadQuality));
+        AudioQuality downloadQuality =
+            AudioQuality.fromString(quality) ?? AudioQuality.normal;
+        Logger("NetConductor").info("Caching ${track.track.id} $i / $lenght");
         caching.add(track.filepath);
+        futures.add(
+          pool.withResource(
+            () => _cacheFileInBackground((track, _yandex, downloadQuality)),
+          ),
+        );
       }
     }
+    await Future.wait(futures);
+    Logger("NetConductor").info("Finished caching ${futures.length} tracks");
   }
 
   static Future<void> _cacheFileInBackground(
@@ -154,20 +210,37 @@ class NetConductor {
     final track = data.$1;
     final instance = data.$2;
     final quality = data.$3;
-    if (track is YandexMusicTrack) {
-      try {
-        final exists = await File(track.filepath).exists();
-        if (!exists) {
-          final download = await instance.tracks.download(
-            track.track.id,
-            quality: quality,
-          );
-          await compute(writeFile, (track.filepath, download));
+    int attempt = 0;
+    const maxRetries = 3;
+    while (attempt < maxRetries) {
+      if (track is YandexMusicTrack && track.track.available != false) {
+        try {
+          attempt += 1;
+          final exists = await File(track.filepath).exists();
+          if (!exists) {
+            final download = await instance.tracks.download(
+              track.track.id,
+              quality: quality,
+            );
+            await compute(writeFile, (track.filepath, download));
+          }
+          Logger("NetConductor").info("Cached ID: ${track.track.id}");
+        } catch (e) {
+          if (attempt < maxRetries) {
+            final delay = Duration(seconds: 1 << attempt);
+            Logger("NetConductor").warning(
+              "Error occured while caching yandex music track. ID: ${track.track.id}' Retrying in ${delay.inSeconds}s...",
+            );
+            await Future.delayed(delay);
+          } else {
+            Logger("NetConductor").severe(
+              'Failed to cache ${track.track.id} after $attempt attempts. '
+              'Available: ${track.track.available}',
+              e,
+            );
+            rethrow;
+          }
         }
-      } catch (e) {
-        Logger(
-          'NetConductor',
-        ).severe('An error has occured while caching online track', e);
       }
     }
   }
@@ -175,5 +248,31 @@ class NetConductor {
   static Future<void> writeFile((String, Uint8List) data) async {
     await File(data.$1).parent.create(recursive: true);
     await File(data.$1).writeAsBytes(data.$2);
+  }
+
+  Future<String?> getPlayableLink(PlayerTrack track) async {
+    switch (track) {
+      case YandexMusicTrack track:
+        try {
+          return await _yandex.tracks.getDownloadLink(track.track.id);
+        } catch (e) {
+          Logger(
+            'NetConductor',
+          ).warning('An error has occured while getting playable link', e);
+          return null;
+        }
+      case YTMusicTrack track:
+        try {
+          ytm.Track? track2 = await YTMusicAPI().getTrack(track.videoId);
+          String? link = track2.streamUrl;
+          return link;
+        } catch (e) {
+          return null;
+        }
+      case LocalTrack _:
+        return null;
+      default:
+        return null;
+    }
   }
 }

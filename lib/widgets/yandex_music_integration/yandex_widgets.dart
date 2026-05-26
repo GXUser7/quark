@@ -987,12 +987,12 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                           );
                           await NetConductor().cacheFiles(
                             playlist.tracks
-                                .map(
-                                  (e) =>
-                                      YandexMusicTrack.fromYMTrack(e),
-                                )
+                                .map((e) => YandexMusicTrack.fromYMTrack(e))
                                 .toList(),
                           );
+                          Logger(
+                            "YandexWidgets/PlaylistPage",
+                          ).fine("Playlist was sucessfully cached.");
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Playlist was sucessfully cached.'),
@@ -1504,8 +1504,7 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                       color: playlistColor.withOpacity(0.2),
                       child: InkWell(
                         onTap: () async {
-                          final result = await FilePicker.platform
-                              .getDirectoryPath();
+                          final result = await FilePicker.platform.getDirectoryPath();
                           if (result == null) {
                             return;
                           }
@@ -1555,12 +1554,12 @@ class _PlaylistInfo extends State<PlaylistInfoWidget> {
                           );
                           await NetConductor().cacheFiles(
                             playlist.tracks
-                                .map(
-                                  (e) =>
-                                      YandexMusicTrack.fromYMTrack(e),
-                                )
+                                .map((e) => YandexMusicTrack.fromYMTrack(e))
                                 .toList(),
                           );
+                          Logger(
+                            "YandexWidgets/PlaylistPage",
+                          ).fine("Playlist was sucessfully cached.");
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Playlist was sucessfully cached.'),
@@ -2098,9 +2097,7 @@ class _ArtistInfo extends State<ArtistInfoWidget> {
                                 final List<PlayerTrack> queue = [];
                                 for (Track albumTrack in tracks!) {
                                   queue.add(
-                                    YandexMusicTrack.fromYMTrack(
-                                      albumTrack,
-                                    ),
+                                    YandexMusicTrack.fromYMTrack(albumTrack),
                                   );
                                 }
                                 await Player.player.playTemporaryQueue(
@@ -2259,10 +2256,7 @@ class _ArtistInfo extends State<ArtistInfoWidget> {
                             final List<PlayerTrack> queue = tracks != null
                                 ? tracks!
                                       .map<PlayerTrack>(
-                                        (e) =>
-                                            YandexMusicTrack.fromYMTrack(
-                                              e,
-                                            ),
+                                        (e) => YandexMusicTrack.fromYMTrack(e),
                                       )
                                       .toList()
                                 : [];
@@ -2318,7 +2312,7 @@ class _ArtistInfo extends State<ArtistInfoWidget> {
                             height: 40,
                             width: 40,
                             child: Icon(
-                              Symbols.upload,
+                              Symbols.share,
                               color: Colors.white,
                               size: 21,
                             ),
@@ -2442,9 +2436,7 @@ class _ArtistInfo extends State<ArtistInfoWidget> {
                                   ? tracks!
                                         .map<PlayerTrack>(
                                           (e) =>
-                                              YandexMusicTrack.fromYMTrack(
-                                                e,
-                                              ),
+                                              YandexMusicTrack.fromYMTrack(e),
                                         )
                                         .toList()
                                   : [];
@@ -2502,7 +2494,7 @@ class _ArtistInfo extends State<ArtistInfoWidget> {
                               height: 40,
                               width: 40,
                               child: Icon(
-                                Symbols.upload,
+                                Symbols.share,
                                 color: Colors.white,
                                 size: 21,
                               ),
@@ -3060,10 +3052,7 @@ class _AlbumInfoWidget extends State<AlbumInfoWidget> {
                             album.tracks
                                 .expand((e) => e)
                                 .toList()
-                                .map(
-                                  (e) =>
-                                      YandexMusicTrack.fromYMTrack(e),
-                                )
+                                .map((e) => YandexMusicTrack.fromYMTrack(e))
                                 .toList(),
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -3504,8 +3493,7 @@ class _AlbumInfoWidget extends State<AlbumInfoWidget> {
                   icon: Symbols.download,
                   onTap: () async {
                     try {
-                      final result = await FilePicker.platform
-                          .getDirectoryPath();
+                      final result = await FilePicker.platform.getDirectoryPath();
                       if (result == null) {
                         return;
                       }
@@ -3526,27 +3514,10 @@ class _AlbumInfoWidget extends State<AlbumInfoWidget> {
                           ),
                         ),
                       );
-                      if (album.tracks.length > 1) {
-                        int disc = 0;
-                        for (List<Track> tracks in album.tracks) {
-                          disc += 1;
-                          await YandexMusicSingleton.exportTracks(
-                          tracks,
-                          Directory(path.join(result, "Disc $disc")),
-                          progressCallback: (a) {
-                            print("$a %");
-                          },
-                        );
-                        }
-                      } else {
-                        await YandexMusicSingleton.exportTracks(
-                          album.tracks.expand((e) => e).toList(),
-                          Directory(result),
-                          progressCallback: (a) {
-                            print("$a %");
-                          },
-                        );
-                      }
+                      await YandexMusicSingleton.exportAlbum(
+                        album,
+                        Directory(result),
+                      );
 
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -3637,7 +3608,7 @@ class _AlbumInfoWidget extends State<AlbumInfoWidget> {
                 const SizedBox(width: 5),
                 IconButton2(
                   accentColor: albumColor,
-                  icon: Symbols.upload,
+                  icon: Symbols.share,
                   onTap: () async {
                     final link = 'https://music.yandex.ru/album/${album.id}';
 
@@ -4093,9 +4064,7 @@ class TrackCard extends StatelessWidget {
         label: "Add to queue",
         value: 'queue',
         onTap: () async {
-          Player.player.insertInQueue(
-            YandexMusicTrack.fromYMTrack(track),
-          );
+          Player.player.insertInQueue(YandexMusicTrack.fromYMTrack(track));
         },
       ),
     );
@@ -4253,9 +4222,7 @@ class TrackCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () async {
-            Player.player.insertInQueue(
-              YandexMusicTrack.fromYMTrack(track),
-            );
+            Player.player.insertInQueue(YandexMusicTrack.fromYMTrack(track));
             await Player.player.playNext(forceNext: true, completed: false);
           },
           child: Row(
