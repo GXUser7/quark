@@ -1057,6 +1057,11 @@ Future<void> _handleTracksChosen(
       sourceId = track.videoId;
       uniquePath = 'youtube:${track.videoId}';
       coverUrl = track.cover;
+    } else if (track is SpotifyTrack) {
+      source = 'spotify';
+      sourceId = track.spotifyId;
+      uniquePath = 'spotify:${track.spotifyId}';
+      coverUrl = track.cover != 'none' ? track.cover : null;
     } else if (track is LocalTrack && track.filepath.startsWith('sc:')) {
       source = 'soundcloud';
       sourceId = track.filepath.replaceFirst('sc:', '');
@@ -1098,6 +1103,8 @@ Future<void> _handleTracksChosen(
       uniquePath = 'yandex:${track.track.id}';
     } else if (track is YTMusicTrack) {
       uniquePath = 'youtube:${track.videoId}';
+    } else if (track is SpotifyTrack) {
+      uniquePath = 'spotify:${track.spotifyId}';
     } else {
       uniquePath = track.filepath;
     }

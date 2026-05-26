@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:pool/pool.dart';
 import 'package:quark/services/soundcloud_services.dart';
 import 'package:quark/services/ytmusic_services.dart';
+import 'package:quark/services/spotify_services.dart';
 
 import 'player.dart';
 import 'package:async/async.dart';
@@ -104,6 +105,18 @@ class NetConductor {
       }
     }
 
+    // spotify — skip if playCustom already resolved to http (LocalTrack) or cached streamUrl
+    if (track is SpotifyTrack &&
+        !await File(track.filepath).exists() &&
+        !(track.streamUrl?.startsWith('http') ?? false)) {
+      try {
+        _operation = CancelableOperation.fromFuture(_playSpotify(track));
+        await _operation!.value;
+      } catch (e) {
+        Logger('NetConductor').severe('Spotify play error: $e');
+      }
+    }
+
     _isLoading = false;
     await cacheFiles();
   }
@@ -140,6 +153,18 @@ class NetConductor {
 
     if (_operation?.isCanceled ?? true) return;
     await _player.playNetTrack(link, track);
+  }
+
+  Future<void> _playSpotify(SpotifyTrack track) async {
+    if (_operation?.isCanceled ?? false) return;
+
+    final url = await SpotifyService().getStreamUrl(track);
+    if (url == null) return;
+
+    track.streamUrl = url;
+
+    if (_operation?.isCanceled ?? true) return;
+    await _player.playNetTrack(url, track);
   }
 
   Future<List<PlayerTrack>> getUncached(List<PlayerTrack> tracks) async {
@@ -266,6 +291,15 @@ class NetConductor {
           ytm.Track? track2 = await YTMusicAPI().getTrack(track.videoId);
           String? link = track2.streamUrl;
           return link;
+        } catch (e) {
+          return null;
+        }
+      case SpotifyTrack track:
+        if (track.streamUrl != null && track.streamUrl!.startsWith('http')) {
+          return track.streamUrl;
+        }
+        try {
+          return await SpotifyService().getStreamUrl(track);
         } catch (e) {
           return null;
         }

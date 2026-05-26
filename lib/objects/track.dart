@@ -110,6 +110,17 @@ abstract class PlayerTrack {
           cover: cover,
         );
 
+      case 'spotify':
+        return SpotifyTrack(
+          spotifyId: t.sourceid ?? '',
+          title: t.title ?? '',
+          artists: artists,
+          albums: albums,
+          filepath: getSpotifyCachePath(t.sourceid ?? ''),
+          coverType: coverType,
+          cover: cover,
+        );
+
       default:
         return LocalTrack.getFromDatabase(t);
     }
@@ -506,6 +517,94 @@ Future<YTMusicTrack> deserializedYTMusicTrack(
     streamUrl: trackData['streamUrl']?.toString(),
     extraData: trackData['extraData'] is Map
         ? Map<String, dynamic>.from(trackData['extraData'])
+        : null,
+  );
+}
+
+class SpotifyTrack extends PlayerTrack {
+  final String spotifyId;
+  String? streamUrl;
+  final int? durationSeconds;
+
+  SpotifyTrack({
+    required this.spotifyId,
+    required super.title,
+    required super.artists,
+    required super.albums,
+    required super.filepath,
+    required super.coverType,
+    this.streamUrl,
+    this.durationSeconds,
+    super.cover,
+    super.coverByted,
+  });
+
+  String get audioSource {
+    if (streamUrl != null &&
+        streamUrl!.isNotEmpty &&
+        streamUrl!.startsWith('http')) {
+      return streamUrl!;
+    }
+    return filepath;
+  }
+
+  bool get isNetworkTrack => audioSource.startsWith('http');
+
+  static SpotifyTrack getNew(SpotifyTrack track) {
+    return SpotifyTrack(
+      spotifyId: track.spotifyId,
+      title: track.title,
+      artists: track.artists,
+      albums: track.albums,
+      filepath: track.filepath,
+      coverType: track.coverType,
+      streamUrl: track.streamUrl,
+      durationSeconds: track.durationSeconds,
+      cover: track.cover,
+      coverByted: track.coverByted,
+    );
+  }
+
+  @override
+  String toString() => 'SpotifyTrack(spotifyId: $spotifyId, title: $title)';
+}
+
+String getSpotifyCachePath(String spotifyId) {
+  return '${ApplicationCacheDirectory.instance.directory.path}'
+      '/cisum_yafitops_krauq$spotifyId.flac';
+}
+
+Map<String, dynamic> serializedSpotifyTrack(SpotifyTrack track) {
+  return {
+    'type': 'spotify',
+    'spotifyId': track.spotifyId,
+    'title': track.title,
+    'artists': track.artists,
+    'albums': track.albums,
+    'filepath': track.filepath,
+    'cover': track.cover,
+    'coverByted': Uint8List(0),
+    'coverType': track.coverType.value,
+    'durationSeconds': track.durationSeconds,
+    'streamUrl': track.streamUrl,
+  };
+}
+
+Future<SpotifyTrack> deserializedSpotifyTrack(
+  Map<String, dynamic> trackData,
+) async {
+  return SpotifyTrack(
+    spotifyId: trackData['spotifyId']?.toString() ?? '',
+    title: trackData['title']?.toString() ?? 'Unknown',
+    artists: List<String>.from(trackData['artists'] ?? []),
+    albums: List<String>.from(trackData['albums'] ?? []),
+    filepath: trackData['filepath']?.toString() ?? '',
+    cover: trackData['cover']?.toString() ?? 'none',
+    coverByted: Uint8List(0),
+    coverType: CoverType.parseString(trackData['coverType'] ?? 'noCover'),
+    streamUrl: trackData['streamUrl']?.toString(),
+    durationSeconds: trackData['durationSeconds'] is num
+        ? (trackData['durationSeconds'] as num).toInt()
         : null,
   );
 }

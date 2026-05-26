@@ -23,7 +23,7 @@ class ApplicationCacheDirectory {
   }
 
   Directory get directory {
-    return _directory!;
+    return _directory ?? Directory.systemTemp;
   }
 }
 

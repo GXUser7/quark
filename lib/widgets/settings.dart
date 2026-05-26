@@ -208,6 +208,22 @@ class _SettingsState extends State<Settings> {
                     ),
                     const SizedBox(height: 10),
                     _YandexMusicSettings(),
+
+                    const SizedBox(height: 15),
+
+                    Padding(
+                      padding: EdgeInsetsGeometry.only(left: 35),
+                      child: Text(
+                        'Spotify',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _SpotifySettings(),
                   ],
                 ),
               ),
@@ -909,6 +925,198 @@ class __DebugSettingsWidget extends State<_DebugSettings> {
               rightPadding,
               ButtonPosition.end,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SpotifySettings extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() => __SpotifySettingsWidget();
+}
+
+class __SpotifySettingsWidget extends State<_SpotifySettings> {
+  bool search = true;
+  String quality = 'Lossless (CD)';
+  final List<String> qualityList = [
+    'Hi-Res FLAC',
+    'Lossless (CD)',
+    'Normal (256kbps)',
+    'Low (64kbps)',
+    'MP3 (320kbps)',
+  ];
+  final Map<String, String> qualityMap = {
+    'hires': 'Hi-Res FLAC',
+    'lossless': 'Lossless (CD)',
+    'nq': 'Normal (256kbps)',
+    'lq': 'Low (64kbps)',
+    'mp3': 'MP3 (320kbps)',
+  };
+  TextEditingController priorityController = TextEditingController(text: '');
+  final db = DatabaseStreamerService();
+
+  void setQuality(String value) async {
+    final Map<String, String> qualityReverse = {
+      for (var entry in qualityMap.entries) entry.value: entry.key,
+    };
+    String? qualityCode = qualityReverse[value];
+    if (qualityCode != null) {
+      db.spotifyQuality.value = qualityCode;
+      if (!mounted) return;
+      setState(() {
+        quality = value;
+      });
+    }
+  }
+
+  void setSearch(bool value) async {
+    db.spotifySearch.value = value;
+  }
+
+  void initDatabase() {
+    setState(() {
+      priorityController.text = db.spotifySourcePriority.value;
+      quality = qualityMap[db.spotifyQuality.value] ?? quality;
+      search = db.spotifySearch.value;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    initDatabase();
+  }
+
+  @override
+  void dispose() {
+    priorityController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final maxWidth = min(size.width * 0.92 * 0.92, 800 * 0.92);
+    final textFieldWidth = min(size.width * 0.3, 250.0);
+    final rightPadding = 7.5;
+    return Center(
+      child: Column(
+        children: [
+          button(
+            'Search Integration',
+            'Add tracks found in Spotify to the track search results',
+            Switch(
+              value: search,
+              activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
+              inactiveThumbColor: Colors.grey[300],
+              inactiveTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
+              onChanged: (a) {
+                setState(() {
+                  search = a;
+                });
+                setSearch(a);
+              },
+            ),
+            maxWidth,
+            rightPadding,
+            ButtonPosition.start,
+          ),
+          SizedBox(height: 1),
+          button(
+            'Streaming Quality',
+            "Default quality level resolved from fallbacks.",
+            DropdownButton<String>(
+              dropdownColor: const Color.fromRGBO(44, 44, 44, 0.2),
+              value: qualityList.contains(quality)
+                  ? quality
+                  : 'Lossless (CD)',
+              borderRadius: BorderRadius.all(Radius.circular(5)),
+              elevation: 16,
+              focusColor: const Color.fromARGB(113, 255, 255, 255),
+              style: const TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+              underline: SizedBox.shrink(),
+              onChanged: (String? value) {
+                if (value != null) {
+                  setQuality(value);
+                }
+              },
+              items: qualityList.map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+            ),
+            maxWidth,
+            rightPadding,
+            ButtonPosition.center,
+          ),
+          SizedBox(height: 1),
+          button(
+            'Source Priority',
+            "Reserved for future use. Streaming now uses GDStudio (Tidal).",
+            Padding(
+              padding: EdgeInsets.only(right: rightPadding),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: textFieldWidth,
+                    height: 40,
+                    child: TextField(
+                      onChanged: (value) {
+                        db.spotifySourcePriority.value = value;
+                      },
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(220),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      controller: priorityController,
+                      decoration: InputDecoration(
+                        hintText: 'gdstudio (tidal)',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withAlpha(178),
+                          overflow: TextOverflow.ellipsis,
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: Colors.white.withAlpha(155),
+                            width: 1,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: Colors.white.withAlpha(155),
+                            width: 1,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: Colors.white.withAlpha(155),
+                            width: 1.5,
+                          ),
+                        ),
+                        filled: false,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            maxWidth,
+            rightPadding,
+            ButtonPosition.end,
           ),
         ],
       ),

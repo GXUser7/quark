@@ -137,7 +137,19 @@ enum DatabaseKeys {
 
   /// ```String```
   /// VK account access token
-  scProfileUrl('scProfileUrl');
+  scProfileUrl('scProfileUrl'),
+
+  /// ```bool```
+  /// Enables spotify music search
+  spotifySearch('spotify_search'),
+
+  /// ```String```
+  /// Spotify track resolution quality (lossless, nq, lq)
+  spotifyQuality('spotify_quality'),
+
+  /// ```String```
+  /// Reserved for future Spotify stream resolver priority
+  spotifySourcePriority('spotify_source_priority');
   
 
   final String value;
