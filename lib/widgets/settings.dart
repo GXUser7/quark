@@ -12,6 +12,7 @@ import 'package:quark/services/database/database.dart';
 import 'package:quark/services/database/listen_logger.dart';
 import 'package:interactive_slider/interactive_slider.dart';
 import 'package:quark/services/native_controls/native_control.dart';
+import 'package:quark/l10n/app_localizations.dart'; // ✅ Импорт локализации
 
 class Settings extends StatefulWidget {
   final Function() closeView;
@@ -23,9 +24,12 @@ class Settings extends StatefulWidget {
 
 class _SettingsState extends State<Settings> {
   int taps = 0;
+  
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!; // ✅ Локализация
     final size = MediaQuery.of(context).size;
+    
     return Center(
       child: Container(
         width: min(size.width * 0.92, 800),
@@ -69,7 +73,7 @@ class _SettingsState extends State<Settings> {
                         }),
                         behavior: HitTestBehavior.opaque,
                         child: Text(
-                          'Preferences',
+                          l10n.preferences, // ✅ 'Preferences' → локализовано
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 15,
@@ -79,13 +83,91 @@ class _SettingsState extends State<Settings> {
                       ),
                     ),
 
+                    // 🌍 Выбор языка (добавлено)
+                    Padding(
+                      padding: EdgeInsetsGeometry.only(left: 35, right: 35),
+                      child: Row(
+                        children: [
+                          Text(
+                            '🌐 ${l10n.settings}:',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          DropdownButton<Locale>(
+                            dropdownColor: const Color.fromRGBO(44, 44, 44, 0.9),
+                            value: Localizations.localeOf(context),
+                            underline: SizedBox.shrink(),
+                            style: TextStyle(color: Colors.white, fontSize: 13),
+                            items: [
+                              DropdownMenuItem(
+                                value: Locale('en', ''),
+                                child: Text('English'),
+                              ),
+                              DropdownMenuItem(
+                                value: Locale('ru', ''),
+                                child: Text('Русский'),
+                              ),
+                              DropdownMenuItem(
+                                value: Locale('es', ''),
+                                child: Text('Español'),
+                              ),
+                              DropdownMenuItem(
+                                value: Locale('fr', ''),
+                                child: Text('Français'),
+                              ),
+                              DropdownMenuItem(
+                                value: Locale('de', ''),
+                                child: Text('Deutsch'),
+                              ),
+                              DropdownMenuItem(
+                                value: Locale('pt', ''),
+                                child: Text('Português'),
+                              ),
+                              DropdownMenuItem(
+                                value: Locale('zh', ''),
+                                child: Text('中文'),
+                              ),
+                              DropdownMenuItem(
+                                value: Locale('ja', ''),
+                                child: Text('日本語'),
+                              ),
+                              DropdownMenuItem(
+                                value: Locale('ko', ''),
+                                child: Text('한국어'),
+                              ),
+                              DropdownMenuItem(
+                                value: Locale('tr', ''),
+                                child: Text('Türkçe'),
+                              ),
+                            ],
+                            onChanged: (Locale? newLocale) async {
+                              if (newLocale != null) {
+                                // Сохраняем выбор в настройках
+                                await DatabaseStreamerService()
+                                    .setAppLocale(newLocale);
+                                // Перезагружаем интерфейс
+                                if (mounted) {
+                                  setState(() {});
+                                }
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
                     if (taps >= 5) ...[
                       const SizedBox(height: 15),
 
                       Padding(
                         padding: EdgeInsetsGeometry.only(left: 35),
                         child: Text(
-                          'Debug',
+                          l10n.debug, // ✅ 'Debug'
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -100,7 +182,7 @@ class _SettingsState extends State<Settings> {
                     Padding(
                       padding: EdgeInsetsGeometry.only(left: 35),
                       child: Text(
-                        'Main',
+                        l10n.main, // ✅ 'Main'
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -116,7 +198,7 @@ class _SettingsState extends State<Settings> {
                     Padding(
                       padding: EdgeInsetsGeometry.only(left: 35),
                       child: Text(
-                        'Yandex Music',
+                        l10n.yandexMusic, // ✅ 'Yandex Music'
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -148,8 +230,8 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
   bool recursiveFilesAdding = true;
   bool dynamicWindowColor = true;
   int clicks = 0;
-  String restoreText = 'Restore';
-  String audioEngine = 'Restore';
+  String? restoreText; 
+  String? audioEngine; 
   bool? databaseError;
   InteractiveSliderController transitionSpeedController =
       InteractiveSliderController(1.0);
@@ -210,16 +292,25 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!; // ✅ Локализация
     final size = MediaQuery.of(context).size;
     final maxWidth = min(size.width * 0.92 * 0.92, 800 * 0.92);
     final rightPadding = 7.5;
+    
+    // ✅ Определяем рекомендуемый движок с локализацией
+    final recommendedEngine = Platform.isAndroid
+        ? l10n.audioEngineJustAudio
+        : Platform.isWindows
+            ? l10n.audioEngineStandart
+            : l10n.audioEngineJustAudioMK;
+
     return Center(
       child: Column(
         children: [
           if (databaseError == true || Database.lastError != null)
             button(
-              'WARNING',
-              'The database is unavailable or contains errors. Changes may not be saved. Check the logs.',
+              l10n.warning, 
+              l10n.databaseWarning,
               SizedBox.shrink(),
               maxWidth,
               rightPadding,
@@ -229,12 +320,8 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
             ),
           SizedBox(height: 1),
           button(
-            'Audio engine',
-            'Recommended for your platform: ${Platform.isAndroid
-                ? "JustAudio"
-                : Platform.isWindows
-                ? "Standart"
-                : "JustAudioMK"}',
+            l10n.audioEngine, 
+            l10n.audioEngineHint(recommendedEngine),
             DropdownButton<String>(
               dropdownColor: const Color.fromRGBO(44, 44, 44, 0.2),
               value: audioEngineList.contains(audioEngine)
@@ -256,9 +343,14 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
               items: audioEngineList.map<DropdownMenuItem<String>>((
                 String value,
               ) {
+                final localizedValue = value == 'Standart'
+                    ? l10n.audioEngineStandart
+                    : value == 'Just Audio'
+                        ? l10n.audioEngineJustAudio
+                        : 'Just Audio MK';
                 return DropdownMenuItem<String>(
                   value: value,
-                  child: Text(value),
+                  child: Text(localizedValue),
                 );
               }).toList(),
             ),
@@ -271,8 +363,8 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
 
           SizedBox(height: 1),
           button(
-            'Recursively adding files',
-            'The player will check not only the top folder, but also all subfolders to add local tracks.',
+            l10n.recursiveFiles, // ✅ 'Recursively adding files'
+            l10n.recursiveFilesHint, // ✅ описание
             Switch(
               value: recursiveFilesAdding,
               activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
@@ -294,8 +386,8 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
 
           SizedBox(height: 1),
           button(
-            'Playlist opening area',
-            'When you hover to the left side of the screen, the playlistView will automatically open.',
+            l10n.playlistArea, // ✅ 'Playlist opening area'
+            l10n.playlistAreaHint,
             Switch(
               value: playlistOpeningArea,
               activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
@@ -315,8 +407,8 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
           SizedBox(height: 1),
 
           button(
-            'State indicator',
-            'Turn on/off the status indicator that notifies you when network operations are being performed.',
+            l10n.stateIndicator,
+            l10n.stateIndicatorHint,
             Switch(
               value: stateIndicatorState,
               activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
@@ -329,15 +421,14 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
                 setIndicator(a);
               },
             ),
-
             maxWidth,
             rightPadding,
             ButtonPosition.end,
           ),
           SizedBox(height: 1),
           button(
-            'Transition speed',
-            'Change the speed of most animations in the application.',
+            l10n.transitionSpeed,
+            l10n.transitionSpeedHint,
             SizedBox(
               width: 150,
               child: InteractiveSlider(
@@ -351,7 +442,6 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
                   DatabaseStreamerService().transitionSpeed.value = value;
                 },
                 onFocused: (value) {},
-
                 brightness: Brightness.light,
                 initialProgress: 1.0,
                 iconColor: Colors.white,
@@ -368,8 +458,8 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
           SizedBox(height: 1),
           if (Platform.isLinux) ...[
             button(
-              'Dynamic window color',
-              'The window color will change dynamically depending on the content on the screen.',
+              l10n.dynamicWindowColor,
+              l10n.dynamicWindowColorHint,
               Switch(
                 value: dynamicWindowColor,
                 activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
@@ -382,7 +472,6 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
                   DatabaseStreamerService().dynamicWindowColor.value = a;
                 },
               ),
-
               maxWidth,
               rightPadding,
               ButtonPosition.center,
@@ -391,21 +480,21 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
           ],
 
           button(
-            'Restore defaults',
-            'Reset player settings to factory defaults. After resetting, it is recommended to restart the player.',
+            l10n.restoreDefaults,
+            l10n.restoreDefaultsHint,
             Material(
               color: Colors.transparent,
               child: InkWell(
                 onTap: () async {
                   if (clicks < 2) {
                     setState(() {
-                      restoreText = 'Again';
+                      restoreText = l10n.again; // ✅ 'Again'
                       clicks += 1;
                     });
                   } else {
                     await restoreDefaults();
                     setState(() {
-                      restoreText = 'Restore';
+                      restoreText = l10n.restore; // ✅ 'Restore'
                       clicks = 0;
                     });
                   }
@@ -418,7 +507,7 @@ class __LocalSettingsWidget extends State<_LocalSettings> {
                   ),
                   child: Center(
                     child: Text(
-                      restoreText,
+                      restoreText ?? l10n.restore, // ✅ fallback
                       style: TextStyle(
                         color: Colors.red,
                         fontSize: 12,
@@ -447,7 +536,7 @@ class _YandexMusicSettings extends StatefulWidget {
 class __YandexMusicSettingsWidget extends State<_YandexMusicSettings> {
   bool search = true;
   bool yandexMusicPreload = true;
-  String quality = 'MP3 (320kbps)';
+  String? quality; // ✅ nullable
   List<String> qualityList = [
     'Lossless (Max)',
     'Normal (256kbps)',
@@ -540,22 +629,23 @@ class __YandexMusicSettingsWidget extends State<_YandexMusicSettings> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!; // ✅ Локализация
     final size = MediaQuery.of(context).size;
     final maxWidth = min(size.width * 0.92 * 0.92, 800 * 0.92);
     final textFieldWidth = min(size.width * 0.3, 250.0);
     final rightPadding = 7.5;
+    
     return Center(
       child: Column(
         children: [
           button(
-            'Search',
-            'Add tracks found in Yandex Music to the track search in the playlist',
+            l10n.searchInYandex, // ✅ 'Search'
+            l10n.searchInYandexHint,
             Switch(
               value: search,
               activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
               inactiveThumbColor: Colors.grey[300],
               inactiveTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
-              // activeThumbColor: Colors.white,
               onChanged: (a) {
                 setState(() {
                   search = a;
@@ -570,14 +660,13 @@ class __YandexMusicSettingsWidget extends State<_YandexMusicSettings> {
           SizedBox(height: 1),
 
           button(
-            'Yandex Music Preload',
-            "When the player starts, Yandex Music will initialize during the player's loading to speed up the process of interacting.",
+            l10n.yandexPreload,
+            l10n.yandexPreloadHint,
             Switch(
               value: yandexMusicPreload,
               activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
               inactiveThumbColor: Colors.grey[300],
               inactiveTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
-              // activeThumbColor: const Color.fromARGB(255, 255, 255, 255),
               onChanged: (a) {
                 setState(() {
                   yandexMusicPreload = a;
@@ -595,14 +684,13 @@ class __YandexMusicSettingsWidget extends State<_YandexMusicSettings> {
                 DatabaseStreamerService().originalImageSizeForCoverView,
             builder: (context, originalSize, child) {
               return button(
-                'Original cover size',
-                'When viewing an enlarged cover, it will be at its maximum size instead of the standard 1000x1000.',
+                l10n.originalCoverSize,
+                l10n.originalCoverSizeHint,
                 Switch(
                   value: originalSize,
                   activeTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
                   inactiveThumbColor: Colors.grey[300],
                   inactiveTrackColor: const Color.fromRGBO(77, 77, 77, 0.3),
-                  // activeThumbColor: Colors.white,
                   onChanged: (a) {
                     DatabaseStreamerService()
                             .originalImageSizeForCoverView
@@ -620,13 +708,13 @@ class __YandexMusicSettingsWidget extends State<_YandexMusicSettings> {
           SizedBox(height: 1),
 
           button(
-            'Quality',
-            "Quality of downloaded tracks.",
+            l10n.quality,
+            l10n.qualityHint,
             DropdownButton<String>(
               dropdownColor: const Color.fromRGBO(44, 44, 44, 0.2),
               value: qualityList.contains(quality)
                   ? quality
-                  : 'Normal (256kbps)',
+                  : l10n.qualityNormal,
               borderRadius: BorderRadius.all(Radius.circular(5)),
               elevation: 16,
               focusColor: const Color.fromARGB(113, 255, 255, 255),
@@ -638,9 +726,15 @@ class __YandexMusicSettingsWidget extends State<_YandexMusicSettings> {
                 }
               },
               items: qualityList.map<DropdownMenuItem<String>>((String value) {
+                // ✅ Локализуем названия качеств
+                final localizedValue = value == 'Lossless (Max)'
+                    ? l10n.qualityLossless
+                    : value == 'Normal (256kbps)'
+                        ? l10n.qualityNormal
+                        : l10n.qualityLow;
                 return DropdownMenuItem<String>(
                   value: value,
-                  child: Text(value),
+                  child: Text(localizedValue),
                 );
               }).toList(),
             ),
@@ -651,8 +745,8 @@ class __YandexMusicSettingsWidget extends State<_YandexMusicSettings> {
 
           SizedBox(height: 1),
           button(
-            'Token',
-            "Your Yandex account token.",
+            l10n.token,
+            l10n.tokenHint,
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -665,7 +759,6 @@ class __YandexMusicSettingsWidget extends State<_YandexMusicSettings> {
                       SizedBox(
                         width: textFieldWidth,
                         height: 40,
-
                         child: TextField(
                           onChanged: (value) => yandexMusicChecker(value),
                           style: TextStyle(
@@ -676,11 +769,10 @@ class __YandexMusicSettingsWidget extends State<_YandexMusicSettings> {
                           ),
                           controller: controller,
                           decoration: InputDecoration(
-                            hintText: 'Enter token here',
+                            hintText: l10n.tokenPlaceholder, // ✅ 'Enter token here'
                             hintStyle: TextStyle(
                               color: Colors.white.withAlpha(178),
                               overflow: TextOverflow.ellipsis,
-
                               fontSize: 14,
                             ),
                             border: OutlineInputBorder(
@@ -740,9 +832,11 @@ class __DebugSettingsWidget extends State<_DebugSettings> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!; // ✅ Локализация
     final size = MediaQuery.of(context).size;
     final maxWidth = min(size.width * 0.92 * 0.92, 800 * 0.92);
     final rightPadding = 7.5;
+    
     return Center(
       child: Column(
         children: [
@@ -769,45 +863,17 @@ class __DebugSettingsWidget extends State<_DebugSettings> {
               );
             },
             child: button(
-              'Database',
-              'Inited: ${Database.isInited} || LastError: ${Database.lastError}',
+              l10n.database, 
+              l10n.databaseInfo(
+                Database.isInited.toString(),
+                Database.lastError?.toString() ?? 'null',
+              ),
               SizedBox.shrink(),
               maxWidth,
               rightPadding,
               ButtonPosition.start,
             ),
           ),
-          // SizedBox(height: 1),
-          //           InkWell(
-          //   onTap: () async {
-          //     await showDialog(
-          //       context: context,
-          //       builder: (builder) => GestureDetector(
-          //         onTap: () => Navigator.pop(context),
-          //         child: SingleChildScrollView(
-          //           child: SizedBox(
-          //             width: maxWidth,
-          //             height: maxWidth,
-          //             child: Center(
-          //               child: Text(
-          //                 ListenLogger().lastError.toString(),
-          //                 style: TextStyle(color: Colors.white),
-          //                 textAlign: TextAlign.center,
-          //               ),
-          //             ),
-          //           ),
-          //         ),
-          //       ),
-          //     );
-          //   },
-          //   child: button(
-          //   'ListenLogger',
-          //   'Inited: ${ListenLogger().inited} || Init tries: ${NativeControl().initTries} || LastError: ${ListenLogger().lastError}',
-          //   SizedBox.shrink(),
-          //   maxWidth,
-          //   rightPadding,
-          //   ButtonPosition.center,
-          //           )),
           SizedBox(height: 1),
           InkWell(
             onTap: () async {
@@ -832,8 +898,12 @@ class __DebugSettingsWidget extends State<_DebugSettings> {
               );
             },
             child: button(
-              'NativeControl',
-              'Inited: ${NativeControl().inited} || Init tries: ${NativeControl().initTries} || LastError: ${NativeControl().lastError}',
+              l10n.nativeControl,
+              l10n.nativeControlInfo(
+                NativeControl().inited.toString(),
+                NativeControl().initTries.toString(),
+                NativeControl().lastError?.toString() ?? 'null',
+              ),
               SizedBox.shrink(),
               maxWidth,
               rightPadding,

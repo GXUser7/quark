@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:flutter/material.dart';
+
 import 'settings_engine.dart';
 import 'package:logging/logging.dart';
 import 'package:flutter/foundation.dart';
@@ -21,6 +23,9 @@ class DatabaseStreamerService {
     _attachListeners();
     Logger('DatabaseStreamerService').fine('Inited');
   }
+
+  final ValueNotifier<Locale?> _appLocale = ValueNotifier<Locale?>(null);
+  ValueNotifier<Locale?> get appLocale => _appLocale;
 
   final volume = ValueNotifier<double>(0.7);
   final stateIndicator = ValueNotifier<bool>(true);
@@ -58,7 +63,6 @@ class DatabaseStreamerService {
   final scOauthToken = ValueNotifier<String>('');
   final scProfileUrl = ValueNotifier<String>('');
 
-
   late final Listenable all = Listenable.merge([
     volume,
     stateIndicator,
@@ -88,7 +92,7 @@ class DatabaseStreamerService {
     vkMusicToken,
     isLoggedIn,
     scOauthToken,
-    scProfileUrl
+    scProfileUrl,
   ]);
 
   Future<void> reload() async {
@@ -132,9 +136,6 @@ class DatabaseStreamerService {
     final sco = await Database.get(DatabaseKeys.scOauthToken.value);
     final scu = await Database.get(DatabaseKeys.scProfileUrl.value);
 
-    
-
-
     gradientMode.value = gm ?? false;
     lastPlaylistState.value = lps ?? false;
     yandexMusicPlaylists.value = ymp2;
@@ -176,6 +177,12 @@ class DatabaseStreamerService {
     await Database.clear();
     await reload();
   }
+
+  Future<void> setAppLocale(Locale locale) async {
+    _appLocale.value = locale;
+  }
+
+  Locale? getAppLocale() => _appLocale.value;
 
   void _attachSavers() {
     if (!Database.isInited) {
