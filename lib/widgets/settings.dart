@@ -1109,7 +1109,30 @@ class __SpotifySettingsWidget extends State<_SpotifySettings> {
             ),
             maxWidth,
             rightPadding,
-            ButtonPosition.end,
+            ButtonPosition.center,
+          ),
+          const SizedBox(height: 1),
+          ValueListenableBuilder<bool>(
+            valueListenable: db.spotifyLoggedIn,
+            builder: (context, loggedIn, _) {
+              return button(
+                'Account Status',
+                loggedIn ? 'Logged in to personal Spotify account' : 'Not logged in',
+                loggedIn
+                    ? TextButton(
+                        onPressed: () {
+                          db.spotifyOauthToken.value = '';
+                          db.spotifyRefreshToken.value = '';
+                          db.spotifyLoggedIn.value = false;
+                        },
+                        child: const Text('Log Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                      )
+                    : const Text('Unauthorized', style: TextStyle(color: Colors.white54)),
+                maxWidth,
+                rightPadding,
+                ButtonPosition.end,
+              );
+            },
           ),
         ],
       ),

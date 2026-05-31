@@ -69,7 +69,11 @@ abstract class PlayerTrack {
         ? t.album!.split(',').map((e) => e.trim()).toList()
         : ['Unknown album'];
 
-    final cover = t.coverUrl ?? 'none';
+    var cover = t.coverUrl ?? 'none';
+    if (t.source == 'yandex' && cover != 'none') {
+      cover = cover.replaceFirst('https://', '').replaceFirst('http://', '');
+      cover = cover.replaceAll(RegExp(r'\d+x\d+'), '%%');
+    }
     final coverType = (cover != 'none' && cover.isNotEmpty)
         ? CoverType.url
         : CoverType.noCover;
@@ -77,7 +81,15 @@ abstract class PlayerTrack {
     switch (t.source) {
       case 'yandex':
         final cachedPath = getTrackPath(t.sourceid ?? '');
-        return LocalTrack(
+        final ymTrack = YandexMusicTrack.createMinimalTrack(
+          id: t.sourceid ?? '',
+          title: t.title ?? '',
+          artists: artists,
+          albums: albums,
+          coverUri: cover != 'none' ? cover : null,
+        );
+        return YandexMusicTrack(
+          track: ymTrack,
           title: t.title ?? '',
           artists: artists,
           albums: albums,
@@ -238,6 +250,30 @@ class LocalTrack extends PlayerTrack {
 
 class YandexMusicTrack extends PlayerTrack {
   final Track track;
+
+  static Track createMinimalTrack({
+    required String id,
+    required String title,
+    List<String> artists = const [],
+    List<String> albums = const [],
+    String? coverUri,
+  }) {
+    return Track({
+      'id': id,
+      'title': title,
+      'available': true,
+      'trackSource': 'OWN',
+      'coverUri': coverUri,
+      'durationMs': 0,
+      'ogImage': '',
+      'lyricsInfo': {
+        'hasAvailableSyncLyrics': false,
+        'hasAvailableTextLyrics': false,
+      },
+      'artists': artists.map((a) => {'id': '0', 'name': a, 'various': false, 'composer': false, 'available': true}).toList(),
+      'albums': albums.map((al) => {'id': 0, 'title': al, 'year': 0, 'trackCount': 0}).toList(),
+    });
+  }
 
   YandexMusicTrack({
     required this.track,

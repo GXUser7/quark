@@ -66,6 +66,9 @@ class DatabaseStreamerService {
   final spotifySearch = ValueNotifier<bool>(true);
   final spotifyQuality = ValueNotifier<String>('lossless');
   final spotifySourcePriority = ValueNotifier<String>('gdstudio');
+  final spotifyOauthToken = ValueNotifier<String>('');
+  final spotifyRefreshToken = ValueNotifier<String>('');
+  final spotifyLoggedIn = ValueNotifier<bool>(false);
 
   late final Listenable all = Listenable.merge([
     volume,
@@ -100,6 +103,9 @@ class DatabaseStreamerService {
     spotifySearch,
     spotifyQuality,
     spotifySourcePriority,
+    spotifyOauthToken,
+    spotifyRefreshToken,
+    spotifyLoggedIn,
   ]);
 
   Future<void> reload() async {
@@ -145,6 +151,9 @@ class DatabaseStreamerService {
     final sps = await Database.get(DatabaseKeys.spotifySearch.value);
     final spq = await Database.get(DatabaseKeys.spotifyQuality.value);
     final spp = await Database.get(DatabaseKeys.spotifySourcePriority.value);
+    final spot = await Database.get(DatabaseKeys.spotifyOauthToken.value);
+    final sprt = await Database.get(DatabaseKeys.spotifyRefreshToken.value);
+    final spl = await Database.get(DatabaseKeys.spotifyLoggedIn.value);
 
     gradientMode.value = gm ?? false;
     lastPlaylistState.value = lps ?? false;
@@ -182,6 +191,9 @@ class DatabaseStreamerService {
     spotifySearch.value = sps ?? true;
     spotifyQuality.value = spq ?? 'lossless';
     spotifySourcePriority.value = spp ?? 'gdstudio';
+    spotifyOauthToken.value = spot ?? '';
+    spotifyRefreshToken.value = sprt ?? '';
+    spotifyLoggedIn.value = spl ?? false;
 
     await Player.player.setVolume(Platform.isAndroid ? 1.0 : volume.value);
   }
@@ -252,6 +264,9 @@ class DatabaseStreamerService {
     bind(spotifySearch, DatabaseKeys.spotifySearch);
     bind(spotifyQuality, DatabaseKeys.spotifyQuality);
     bind(spotifySourcePriority, DatabaseKeys.spotifySourcePriority);
+    bind(spotifyOauthToken, DatabaseKeys.spotifyOauthToken);
+    bind(spotifyRefreshToken, DatabaseKeys.spotifyRefreshToken);
+    bind(spotifyLoggedIn, DatabaseKeys.spotifyLoggedIn);
   }
 
   void _attachListeners() {

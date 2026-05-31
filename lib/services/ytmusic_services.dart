@@ -24,8 +24,8 @@ class YTMusicAPI {
   Future<List<SearchResult>> search(String query, {int limit = 20}) async {
     final response = await dio.get(
       '$baseUrl/search',
-      queryParameters: {
-        'query': 'ytsearch$limit:$query', // формат для yt-dlp
+      data: {
+        'query': query,
         'max_results': limit,
       },
     );
@@ -39,24 +39,81 @@ class YTMusicAPI {
         .toList();
   }
 
+  Future<String?> getLocalYtdlpStream(String videoId) async {
+    try {
+      print('[YTMusicAPI] yt-dlp: Attempting local resolution fallback for videoId: $videoId...');
+      
+      // Try with safe prioritized audio format first, falling back to 'best' format
+      var result = await Process.run('yt-dlp', [
+        '-g',
+        '-f', 'bestaudio[ext=m4a]/bestaudio[acodec!=opus]/bestaudio/best',
+        '--',
+        videoId
+      ]);
+      
+      if (result.exitCode == 0) {
+        final output = result.stdout.toString().trim();
+        if (output.isNotEmpty && output.startsWith('http')) {
+          print('[YTMusicAPI] yt-dlp: Successfully resolved stream URL locally!');
+          return output;
+        }
+      }
+      
+      // Secondary fallback: Run without any format constraints
+      print('[YTMusicAPI] yt-dlp: Primary format extraction failed. Retrying without format constraints...');
+      result = await Process.run('yt-dlp', [
+        '-g',
+        '--',
+        videoId
+      ]);
+      
+      if (result.exitCode == 0) {
+        final output = result.stdout.toString().trim();
+        if (output.isNotEmpty && output.startsWith('http')) {
+          print('[YTMusicAPI] yt-dlp: Successfully resolved stream URL locally on secondary fallback!');
+          return output;
+        }
+      } else {
+        print('[YTMusicAPI] yt-dlp: Local process returned exit code: ${result.exitCode}');
+        print('[YTMusicAPI] yt-dlp: stderr: ${result.stderr}');
+      }
+    } catch (e) {
+      print('[YTMusicAPI] yt-dlp: Failed to execute local yt-dlp: $e');
+    }
+    return null;
+  }
+
   // /api/song
   Future<Track> getTrack(
     String videoId, {
     String format = 'bestaudio[ext=m4a]/bestaudio[acodec!=opus]/bestaudio',
   }) async {
-    final response = await dio.get(
-      '$baseUrl/song',
-      data: {
-        'video_id': videoId,
-        'format': format, // 'ba' = best audio only
-      },
-    );
+    try {
+      final response = await dio.get(
+        '$baseUrl/song',
+        data: {
+          'video_id': videoId,
+          'format': format, // 'ba' = best audio only
+        },
+      );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to fetch track: ${response.statusCode}');
+      if (response.statusCode != 200) {
+        throw Exception('Failed to fetch track: ${response.statusCode}');
+      }
+
+      return Track(response.data as Map<String, dynamic>);
+    } catch (e) {
+      print('[YTMusicAPI] Remote stream resolution failed: $e. Trying local yt-dlp fallback...');
+      final localStream = await getLocalYtdlpStream(videoId);
+      if (localStream != null) {
+        return Track({
+          'id': videoId,
+          'title': 'YouTube Stream (Resolved Locally)',
+          'url': localStream,
+        });
+      }
+      rethrow;
     }
-
-    return Track(response.data as Map<String, dynamic>);
   }
 
   // /api/yt/playlist

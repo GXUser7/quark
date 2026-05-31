@@ -526,6 +526,10 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
       playerPadding = 0.0;
     }
 
+    final double actualGap = (isPlaylistOpened || size.width < 700)
+        ? 12.0
+        : (Platform.isLinux ? 16.0 : 24.0);
+
     return ClipRect(
       child: Material(
         type: MaterialType.transparency,
@@ -956,11 +960,7 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                 },
                               ),
                               SizedBox(
-                                width:
-                                    expandController.isCollapsed ||
-                                        !Platform.isLinux
-                                    ? 24
-                                    : expandedIconGap,
+                                width: actualGap,
                               ),
                               functionPlayerButton(
                                 Icons.shuffle,
@@ -972,11 +972,7 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                     : await Player.player.shuffle(null),
                               ),
                               SizedBox(
-                                width:
-                                    expandController.isCollapsed ||
-                                        !Platform.isLinux
-                                    ? 24
-                                    : expandedIconGap,
+                                width: actualGap,
                               ),
                               if (nowPlayingTrack is YandexMusicTrack)
                                 functionPlayerButton(
@@ -1008,14 +1004,14 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                   (yandexUploadingTracks.contains(
                                     nowPlayingTrack,
                                   )))
-                                const SizedBox(width: 35),
+                                SizedBox(
+                                  width: (isPlaylistOpened || size.width < 700)
+                                      ? 12.0
+                                      : 35.0,
+                                ),
 
                               SizedBox(
-                                width:
-                                    expandController.isCollapsed ||
-                                        !Platform.isLinux
-                                    ? 24
-                                    : expandedIconGap,
+                                width: actualGap,
                               ),
                               functionPlayerButton(
                                 Icons.repeat_one_outlined,
@@ -1025,33 +1021,8 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                     ? await Player.player.disableRepeat()
                                     : await Player.player.enableRepeat(),
                               ),
-                              // functionPlayerButton(
-                              //   Icons.safety_check,
-                              //   Icons.safety_check,
-                              //   isRepeatEnable,
-                              //   () async {
-                              //     final playlist = await YandexMusicSingleton
-                              //         .instance
-                              //         .playlists
-                              //         .getPlaylistByUuid(
-                              //           "d04d5f98-72a6-e193-8b06-b2bf28303e65",
-                              //         );
-                              //     Navigator.push(
-                              //       context,
-                              //       CupertinoPageRoute(
-                              //         builder: (_) => PlaylistInfoWidget(
-                              //           playlist: playlist,
-                              //         ),
-                              //       ),
-                              //     );
-                              //   },
-                              // ),
                               SizedBox(
-                                width:
-                                    expandController.isCollapsed ||
-                                        !Platform.isLinux
-                                    ? 24
-                                    : expandedIconGap,
+                                width: actualGap,
                               ),
                               Material(
                                 color: Color.fromARGB(31, 255, 255, 255),

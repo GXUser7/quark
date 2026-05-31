@@ -131,6 +131,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> deletePlaylist(int playlistId) async {
+    print('[AppDatabase] Deleting playlist with ID: $playlistId...');
     await transaction(() async {
       await (delete(
         playlistTracks,
@@ -138,25 +139,32 @@ class AppDatabase extends _$AppDatabase {
 
       await (delete(playlists)..where((p) => p.id.equals(playlistId))).go();
     });
+    print('[AppDatabase] Successfully deleted playlist with ID: $playlistId.');
   }
 
   Future<void> renamePlaylist(int playlistId, String newTitle) async {
+    print('[AppDatabase] Renaming playlist ID: $playlistId to "$newTitle"...');
     await (update(playlists)..where((p) => p.id.equals(playlistId))).write(
       PlaylistsCompanion(title: Value(newTitle)),
     );
+    print('[AppDatabase] Successfully renamed playlist ID: $playlistId to "$newTitle".');
   }
 
   Future<void> changeCover(int playlistId, String path) async {
+    print('[AppDatabase] Changing cover of playlist ID: $playlistId to path: "$path"...');
     await (update(playlists)..where((p) => p.id.equals(playlistId))).write(
       PlaylistsCompanion(coverPath: Value(path)),
     );
+    print('[AppDatabase] Successfully changed cover of playlist ID: $playlistId.');
   }
 
   /// Returns ID of playlist
   Future<int> createPlaylist(String title) async {
+    print('[AppDatabase] Creating new playlist: "$title"...');
     final result = await into(
       playlists,
     ).insert(PlaylistsCompanion.insert(title: title));
+    print('[AppDatabase] Successfully created playlist: "$title" (Assigned ID: $result).');
     return result;
   }
 
@@ -167,6 +175,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> insertTrackIntoPlaylist(int playlistID, int trackID) async {
+    print('[AppDatabase] Inserting track ID: $trackID into playlist ID: $playlistID...');
     await customInsert(
       'INSERT INTO playlist_tracks (playlist, track, position) '
       'VALUES (?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM playlist_tracks WHERE playlist = ?))',
@@ -177,13 +186,16 @@ class AppDatabase extends _$AppDatabase {
       ],
       updates: {playlistTracks},
     );
+    print('[AppDatabase] Successfully inserted track ID: $trackID into playlist ID: $playlistID.');
   }
 
   Future<void> removeTrackPosition(int playlistID, int position) async {
+    print('[AppDatabase] Removing track at position: $position from playlist ID: $playlistID...');
     await (delete(playlistTracks)..where(
           (t) => t.playlist.equals(playlistID) & t.position.equals(position),
         ))
         .go();
+    print('[AppDatabase] Successfully removed track at position: $position from playlist ID: $playlistID.');
   }
 
   Future<PlaylistWithTracks?> watchPlaylist(int playlistId) async {

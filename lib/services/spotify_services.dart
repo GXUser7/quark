@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:quark/objects/track.dart';
 import 'package:quark/services/database/database.dart';
+import 'package:quark/services/ytmusic_services.dart';
 
 class SpotifyService {
   static final SpotifyService _instance = SpotifyService._internal();
@@ -509,36 +510,329 @@ class SpotifyService {
   Future<String?> getStreamUrl(SpotifyTrack track) async {
     final cached = track.streamUrl;
     if (cached != null && cached.isNotEmpty && cached.startsWith('http')) {
+      print('[SpotifyService] Using cached stream url for: ${track.title}');
       return cached;
     }
 
-    print('[SpotifyService] Resolving stream url for: ${track.title}');
+    print('[SpotifyService] Resolving stream url for: ${track.title} (Spotify ID: ${track.spotifyId})...');
 
     // Step 1: Get ISRC from Spotify metadata
     final isrc = await getIsrc(track.spotifyId);
-    if (isrc == null || isrc.isEmpty) {
+    if (isrc != null && isrc.isNotEmpty) {
+      print('[SpotifyService] Found ISRC: $isrc');
+
+      // Step 2: Look up Tidal track ID by ISRC
+      final tidalId = await getTidalIdByIsrc(isrc);
+      if (tidalId != null) {
+        print('[SpotifyService] Found Tidal Track ID: $tidalId');
+
+        // Step 3: Resolve stream URL from GDStudio (Tidal source)
+        final streamUrl = await _resolveGDStudioTidal(tidalId);
+        if (streamUrl != null) {
+          track.streamUrl = streamUrl;
+          print('[SpotifyService] Successfully resolved stream url via Tidal.');
+          return streamUrl;
+        } else {
+          print('[SpotifyService] GDStudio resolved to null for Tidal Track ID: $tidalId');
+        }
+      } else {
+        print('[SpotifyService] Tidal track not found for ISRC: $isrc');
+      }
+    } else {
       print('[SpotifyService] Failed to find ISRC for track: ${track.title}');
-      return null;
-    }
-    print('[SpotifyService] Found ISRC: $isrc');
-
-    // Step 2: Look up Tidal track ID by ISRC
-    final tidalId = await getTidalIdByIsrc(isrc);
-    if (tidalId == null) {
-      print('[SpotifyService] Tidal track not found for ISRC: $isrc');
-      return null;
-    }
-    print('[SpotifyService] Found Tidal Track ID: $tidalId');
-
-    // Step 3: Resolve stream URL from GDStudio (Tidal source)
-    final streamUrl = await _resolveGDStudioTidal(tidalId);
-    if (streamUrl != null) {
-      track.streamUrl = streamUrl;
-      print('[SpotifyService] Successfully resolved stream url.');
-      return streamUrl;
     }
 
-    print('[SpotifyService] All resolvers failed.');
+    // Fallback: Search YouTube if Tidal resolution fails
+    print('[SpotifyService] Tidal resolution failed. Falling back to YouTube Search...');
+    try {
+      final query = '${track.artists.join(', ')} - ${track.title}';
+      print('[SpotifyService] YouTube search query: "$query"');
+      final searchResults = await YTMusicAPI().search(query, limit: 3);
+      if (searchResults.isEmpty) {
+        print('[SpotifyService] YouTube search returned 0 results for query "$query".');
+      } else {
+        print('[SpotifyService] YouTube search returned ${searchResults.length} results.');
+        for (int i = 0; i < searchResults.length; i++) {
+          final res = searchResults[i];
+          print('[SpotifyService] Result #$i: "${res.title}" by "${res.channel}" (ID: ${res.id})');
+        }
+        
+        final videoId = searchResults.first.id;
+        print('[SpotifyService] Selecting first candidate Video ID: $videoId. Resolving stream URL...');
+        try {
+          final ytTrack = await YTMusicAPI().getTrack(videoId);
+          final streamUrl = ytTrack.streamUrl;
+          if (streamUrl != null && streamUrl.isNotEmpty) {
+            track.streamUrl = streamUrl;
+            print('[SpotifyService] Successfully resolved fallback stream URL from YouTube: $streamUrl');
+            return streamUrl;
+          } else {
+            print('[SpotifyService] YouTube stream URL was null or empty for Video ID: $videoId.');
+          }
+        } catch (songErr) {
+          print('[SpotifyService] Failed resolving YouTube stream URL for Video ID $videoId: $songErr');
+        }
+      }
+    } catch (e) {
+      print('[SpotifyService] YouTube fallback resolution failed: $e');
+    }
+
+    print('[SpotifyService] All resolvers failed for track: "${track.title}" (Spotify ID: ${track.spotifyId}).');
     return null;
+  }
+
+  Future<bool> exchangeCodeForToken(String code) async {
+    final String basicAuth = base64Encode(utf8.encode('598a5a932ba2414fbc203483596f2391:dd2c1d9558154e758a6609c5aae4d98d'));
+    try {
+      final response = await Dio().post(
+        'https://accounts.spotify.com/api/token',
+        data: {
+          'grant_type': 'authorization_code',
+          'code': code,
+          'redirect_uri': 'https://oauth.pstmn.io/v1/browser-callback',
+        },
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+          headers: {
+            'Authorization': 'Basic $basicAuth',
+          },
+        ),
+      );
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final accessToken = data['access_token'] as String;
+        final refreshToken = data['refresh_token'] as String;
+
+        final db = DatabaseStreamerService();
+        db.spotifyOauthToken.value = accessToken;
+        db.spotifyRefreshToken.value = refreshToken;
+        db.spotifyLoggedIn.value = true;
+        return true;
+      }
+    } catch (e) {
+      print('[SpotifyService] Token exchange error: $e');
+    }
+    return false;
+  }
+
+  Future<bool> refreshUserToken() async {
+    final db = DatabaseStreamerService();
+    final refresh = db.spotifyRefreshToken.value;
+    if (refresh.isEmpty) return false;
+    
+    final String basicAuth = base64Encode(utf8.encode('598a5a932ba2414fbc203483596f2391:dd2c1d9558154e758a6609c5aae4d98d'));
+    try {
+      final response = await Dio().post(
+        'https://accounts.spotify.com/api/token',
+        data: {
+          'grant_type': 'refresh_token',
+          'refresh_token': refresh,
+        },
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+          headers: {
+            'Authorization': 'Basic $basicAuth',
+          },
+        ),
+      );
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final accessToken = data['access_token'] as String;
+        db.spotifyOauthToken.value = accessToken;
+        if (data['refresh_token'] != null) {
+          db.spotifyRefreshToken.value = data['refresh_token'] as String;
+        }
+        return true;
+      }
+    } catch (e) {
+      print('[SpotifyService] Refresh token error: $e');
+    }
+    return false;
+  }
+
+  Future<List<Map<String, dynamic>>> getUserPlaylists() async {
+    final db = DatabaseStreamerService();
+    var token = db.spotifyOauthToken.value;
+    if (token.isEmpty) return [];
+
+    Future<Response> makePlaylistsRequest() async {
+      return await Dio().get(
+        'https://api.spotify.com/v1/me/playlists?limit=50',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+    }
+
+    try {
+      final List<Map<String, dynamic>> playlistsList = [];
+
+      // 1. Try to fetch user's Liked Tracks first
+      try {
+        Future<Response> makeLikedRequest() async {
+          return await Dio().get(
+            'https://api.spotify.com/v1/me/tracks?limit=1',
+            options: Options(
+              headers: {
+                'Authorization': 'Bearer $token',
+              },
+            ),
+          );
+        }
+
+        Response responseLiked;
+        try {
+          responseLiked = await makeLikedRequest();
+        } on DioException catch (e) {
+          if (e.response?.statusCode == 401) {
+            final refreshed = await refreshUserToken();
+            if (refreshed) {
+              token = db.spotifyOauthToken.value;
+              responseLiked = await makeLikedRequest();
+            } else {
+              rethrow;
+            }
+          } else {
+            rethrow;
+          }
+        }
+
+        if (responseLiked.statusCode == 200) {
+          final totalLiked = responseLiked.data['total'] as int? ?? 0;
+          if (totalLiked > 0) {
+            playlistsList.add({
+              'id': 'liked_songs_synthetic_id',
+              'name': 'Liked Songs',
+              'cover': 'https://t.scdn.co/images/30782914-b35a-4df2-ab14-c6c339594e57.png',
+              'track_count': totalLiked,
+              'owner': 'Me',
+            });
+          }
+        }
+      } catch (e) {
+        print('[SpotifyService] Error loading liked tracks count: $e');
+      }
+
+      // 2. Fetch standard playlists
+      Response responsePlaylists;
+      try {
+        responsePlaylists = await makePlaylistsRequest();
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 401) {
+          final refreshed = await refreshUserToken();
+          if (refreshed) {
+            token = db.spotifyOauthToken.value;
+            responsePlaylists = await makePlaylistsRequest();
+          } else {
+            rethrow;
+          }
+        } else {
+          rethrow;
+        }
+      }
+
+      if (responsePlaylists.statusCode == 200) {
+        final items = responsePlaylists.data['items'] as List? ?? [];
+        for (final item in items) {
+          final images = item['images'] as List? ?? [];
+          final coverUrl = images.isNotEmpty ? images[0]['url'] as String? ?? '' : '';
+          playlistsList.add({
+            'id': item['id'] as String? ?? '',
+            'name': item['name'] as String? ?? 'Untitled Playlist',
+            'cover': coverUrl,
+            'track_count': item['tracks']?['total'] as int? ?? 0,
+            'owner': item['owner']?['display_name'] as String? ?? 'Unknown',
+          });
+        }
+      }
+      return playlistsList;
+    } catch (e) {
+      print('[SpotifyService] Get user playlists error: $e');
+    }
+    return [];
+  }
+
+  Future<List<SpotifyTrack>> getPlaylistTracks(String playlistId) async {
+    final db = DatabaseStreamerService();
+    var token = db.spotifyOauthToken.value;
+    if (token.isEmpty) return [];
+
+    Future<Response> makeRequest() async {
+      final url = playlistId == 'liked_songs_synthetic_id'
+          ? 'https://api.spotify.com/v1/me/tracks?limit=50'
+          : 'https://api.spotify.com/v1/playlists/$playlistId/tracks?limit=100';
+      return await Dio().get(
+        url,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+    }
+
+    try {
+      Response response;
+      try {
+        response = await makeRequest();
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 401) {
+          final refreshed = await refreshUserToken();
+          if (refreshed) {
+            token = db.spotifyOauthToken.value;
+            response = await makeRequest();
+          } else {
+            rethrow;
+          }
+        } else {
+          rethrow;
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final items = response.data['items'] as List? ?? [];
+        final List<SpotifyTrack> tracks = [];
+        for (final item in items) {
+          final trackData = item['track'];
+          if (trackData == null) continue;
+          final id = trackData['id'] as String? ?? '';
+          final name = trackData['name'] as String? ?? 'Unknown';
+          final durationMs = trackData['duration_ms'] as num?;
+          final durationSeconds = durationMs != null ? durationMs ~/ 1000 : 0;
+
+          final albumData = trackData['album'];
+          final albumName = albumData?['name'] as String? ?? '';
+          final images = albumData?['images'] as List? ?? [];
+          final coverUrl = images.isNotEmpty ? images[0]['url'] as String? ?? '' : '';
+
+          final artistItems = trackData['artists'] as List? ?? [];
+          final List<String> artists = [];
+          for (final artist in artistItems) {
+            final artistName = artist['name'] as String?;
+            if (artistName != null && artistName.isNotEmpty) {
+              artists.add(artistName);
+            }
+          }
+          if (artists.isEmpty) artists.add('Unknown Artist');
+
+          tracks.add(SpotifyTrack(
+            spotifyId: id,
+            title: name,
+            artists: artists,
+            albums: [albumName],
+            filepath: getSpotifyCachePath(id),
+            coverType: coverUrl.isNotEmpty ? CoverType.url : CoverType.noCover,
+            cover: coverUrl.isNotEmpty ? coverUrl : 'none',
+            durationSeconds: durationSeconds,
+          ));
+        }
+        return tracks;
+      }
+    } catch (e) {
+      print('[SpotifyService] Get playlist tracks error: $e');
+    }
+    return [];
   }
 }
