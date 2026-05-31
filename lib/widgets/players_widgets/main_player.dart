@@ -195,7 +195,7 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                   height: MediaQuery.of(context).size.height,
                   width: MediaQuery.of(context).size.width,
                   child: ClipRect(
-                    child: AnimatedSwitcher(
+                     child: AnimatedSwitcher(
                       duration: Duration(
                         milliseconds: (650 * transitionSpeed).round(),
                       ),
@@ -526,10 +526,6 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
       playerPadding = 0.0;
     }
 
-    final double actualGap = (isPlaylistOpened || size.width < 700)
-        ? 12.0
-        : (Platform.isLinux ? 16.0 : 24.0);
-
     return ClipRect(
       child: Material(
         type: MaterialType.transparency,
@@ -783,24 +779,9 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                             ),
                           ),
 
-                          Listener(
-                            onPointerSignal: (pointerSignal) async {
-                              if (pointerSignal is PointerScrollEvent) {
-                                if (pointerSignal.scrollDelta.dy < 0) {
-                                  await Player.player.seek(
-                                    Player.player.playedNotifier.value +
-                                        Duration(seconds: 10),
-                                  );
-                                }
-                                if (pointerSignal.scrollDelta.dy > 0) {
-                                  Duration dur =
-                                      Player.player.playedNotifier.value -
-                                      Duration(seconds: 10);
-                                  await Player.player.seek(
-                                    dur < Duration.zero ? Duration.zero : dur,
-                                  );
-                                }
-                              }
+                          InteractiveViewer(
+                            onInteractionUpdate: (details) async {
+                              // We can seek inside main_player or just use progress widget
                             },
                             child: ProgressWidget(
                               timings: true,
@@ -928,7 +909,7 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                           Listener(
                             onPointerSignal: (pointerSignal) async {
                               if (pointerSignal is PointerScrollEvent) {
-                                if (pointerSignal.scrollDelta.dy < 0) {
+                               if (pointerSignal.scrollDelta.dy < 0) {
                                   await Player.player.setVolume(
                                     Player.player.volumeNotifier.value + 0.025,
                                   );
@@ -960,7 +941,11 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                 },
                               ),
                               SizedBox(
-                                width: actualGap,
+                                width:
+                                    expandController.isCollapsed ||
+                                        !Platform.isLinux
+                                    ? 24
+                                    : expandedIconGap,
                               ),
                               functionPlayerButton(
                                 Icons.shuffle,
@@ -972,7 +957,11 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                     : await Player.player.shuffle(null),
                               ),
                               SizedBox(
-                                width: actualGap,
+                                width:
+                                    expandController.isCollapsed ||
+                                        !Platform.isLinux
+                                    ? 24
+                                    : expandedIconGap,
                               ),
                               if (nowPlayingTrack is YandexMusicTrack)
                                 functionPlayerButton(
@@ -1004,14 +993,14 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                   (yandexUploadingTracks.contains(
                                     nowPlayingTrack,
                                   )))
-                                SizedBox(
-                                  width: (isPlaylistOpened || size.width < 700)
-                                      ? 12.0
-                                      : 35.0,
-                                ),
+                                const SizedBox(width: 35),
 
                               SizedBox(
-                                width: actualGap,
+                                width:
+                                    expandController.isCollapsed ||
+                                        !Platform.isLinux
+                                    ? 24
+                                    : expandedIconGap,
                               ),
                               functionPlayerButton(
                                 Icons.repeat_one_outlined,
@@ -1022,7 +1011,11 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                                     : await Player.player.enableRepeat(),
                               ),
                               SizedBox(
-                                width: actualGap,
+                                width:
+                                    expandController.isCollapsed ||
+                                        !Platform.isLinux
+                                    ? 24
+                                    : expandedIconGap,
                               ),
                               Material(
                                 color: Color.fromARGB(31, 255, 255, 255),
@@ -1206,22 +1199,6 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                 ),
               ),
 
-            // // TODO: MY WAVE
-            // if (Player.player.playlistInfo.source ==
-            //         PlaylistSource.yandexMusic &&
-            //     waveWidget)
-            //   Positioned(
-            //     left: 0,
-            //     child: SlideTransition(
-            //       position: playlistOffsetAnimation,
-            //       child: MyWaveView(
-            //         showOperation: showOperation,
-            //         closePlaylist: () {
-            //           togglePlaylist();
-            //         },
-            //       ),
-            //     ),
-            //   ),
             if (isPlaylistOpened &&
                 Player.player.nowPlayingTrack is YandexMusicTrack)
               Positioned(
@@ -1248,15 +1225,6 @@ class _MainPlayerState extends State<MainPlayer> with TickerProviderStateMixin {
                         }
                       }),
                     ),
-
-                    // // TODO: MY WAVE
-                    // MarkItemWidget(
-                    //   icon: Icon(Symbols.waves, color: Colors.white),
-                    //   onTap: () => setState(() {
-                    //     infoWidget = false;
-                    //     waveWidget = true;
-                    //   }),
-                    // ),
                   ],
                 ),
               ),
@@ -1476,34 +1444,3 @@ class _WarningMessage extends State<WarningMessage> {
     );
   }
 }
-
-// class VideoWidget extends StatefulWidget {
-//   final String url;
-//   const VideoWidget({super.key, required this.url});
-
-//   @override
-//   State<VideoWidget> createState() => _VideoWidgetState();
-// }
-
-// class _VideoWidgetState extends State<VideoWidget> {
-//   late final player = mk.Player();
-//   late final controller = mkv.VideoController(player);
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     player.open(mk.Media(widget.url));
-//     player.setVolume(0);
-//   }
-
-//   @override
-//   void dispose() {
-//     player.dispose();
-//     super.dispose();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return mkv.Video(controller: controller, fit: BoxFit.cover);
-//   }
-// }
