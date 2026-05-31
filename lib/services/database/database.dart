@@ -26,6 +26,7 @@ class DatabaseStreamerService {
 
   final ValueNotifier<Locale?> _appLocale = ValueNotifier<Locale?>(null);
   ValueNotifier<Locale?> get appLocale => _appLocale;
+  ValueNotifier<ThemeMode> appThemeMode = ValueNotifier(ThemeMode.dark);
 
   final volume = ValueNotifier<double>(0.7);
   final stateIndicator = ValueNotifier<bool>(true);
@@ -98,7 +99,7 @@ class DatabaseStreamerService {
     scProfileUrl,
     spotifySearch,
     spotifyQuality,
-    spotifySourcePriority
+    spotifySourcePriority,
   ]);
 
   Future<void> reload() async {

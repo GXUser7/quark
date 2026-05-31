@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:quark/services/playlist_sync_services.dart';
-import 'database//database.dart';
+import 'database/database.dart';
 import 'database/settings_engine.dart';
 
 const String baseUrl = 'https://quarkaudio.ru/api/auth';
@@ -18,14 +18,6 @@ class AuthService {
   Future<void> init() async {
     await loadTokens();
   }
-
-  // static const _storage = FlutterSecureStorage(
-  //   aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  //   iOptions: IOSOptions(
-  //     accessibility: KeychainAccessibility.first_unlock_this_device,
-  //     synchronizable: false,
-  //   ),
-  // );
 
   final db = DatabaseStreamerService();
 
@@ -56,15 +48,9 @@ class AuthService {
       db.accessToken.value = access;
       db.refreshToken.value = refresh;
       db.isLoggedIn.value = true;
-      await Database.put(
-        DatabaseKeys.accessToken.value,
-        access,
-      ); // 'accessToken'
-      await Database.put(
-        DatabaseKeys.refreshToken.value,
-        refresh,
-      ); // 'refreshToken'
-      await Database.put(DatabaseKeys.isLoggedIn.value, true); // 'isLoggedIn'
+      await Database.put(DatabaseKeys.accessToken.value, access);
+      await Database.put(DatabaseKeys.refreshToken.value, refresh);
+      await Database.put(DatabaseKeys.isLoggedIn.value, true);
       print('Saved: access=$access');
       print('Saved: refresh=$refresh');
     } catch (e) {
@@ -115,9 +101,6 @@ class AuthService {
       final data = jsonDecode(response.body);
       await _saveTokens(data['access_token'], data['refresh_token']);
 
-      // TODO: finish secret storage parasha
-      // await _saveTokens(data['access_token'], data['refresh_token']);
-
       if (AuthService().isLoggedIn) {
         unawaited(_syncPlaylists());
       }
@@ -127,28 +110,21 @@ class AuthService {
   }
 
   Future<void> _syncPlaylists() async {
-  try {
-    print('AUTH SYNC: starting download');
-    await PlaylistSyncService().downloadAndSave();
-    print('AUTH SYNC: download done');
-    await PlaylistSyncService().uploadAll();
-    print('AUTH SYNC: upload done');
-  } catch (e, st) {
-    print('AUTH SYNC ERROR: $e');
-    print(st);
+    try {
+      print('AUTH SYNC: starting download');
+      await PlaylistSyncService().downloadAndSave();
+      print('AUTH SYNC: download done');
+      await PlaylistSyncService().uploadAll();
+      print('AUTH SYNC: upload done');
+    } catch (e, st) {
+      print('AUTH SYNC ERROR: $e');
+      print(st);
+    }
   }
-}
 
   Future<void> refresh() async {
-    print('refreshToken field: $refreshToken');
-    print('refreshToken db: ${db.refreshToken.value}');
-
-    final rt = db.refreshToken.value.isEmpty
-        ? refreshToken
-        : db.refreshToken.value;
+    final rt = db.refreshToken.value.isEmpty ? refreshToken : db.refreshToken.value;
     if (rt == null || rt.isEmpty) throw Exception('No refresh token');
-
-    print('rt to use: $rt');
 
     final response = await http.post(
       Uri.parse('$baseUrl/refresh'),
@@ -168,9 +144,6 @@ class AuthService {
   Future<http.Response> authorizedRequest(
     Future<http.Response> Function(String token) request,
   ) async {
-    // accessToken ??= await _storage.read(key: _keyAccess);
-    // if (accessToken == null) throw Exception('not authenticated');
-
     if (accessToken == null || accessToken!.isEmpty) {
       try {
         await refresh();
@@ -183,12 +156,10 @@ class AuthService {
       throw Exception('not authenticated');
     }
 
-    if (DatabaseStreamerService().isLoggedIn.value == false) {}
     var response = await request(accessToken!);
 
     if (response.statusCode == 401) {
       await refresh();
-
       if (accessToken == null || accessToken!.isEmpty) {
         throw Exception('Session expired, please login again');
       }
@@ -227,8 +198,7 @@ class AuthService {
           body: jsonEncode({'refresh_token': refreshToken}),
         );
       }
-    } catch (_) {
-    } finally {
+    } catch (_) {} finally {
       await _clearTokens();
     }
   }
@@ -245,9 +215,6 @@ class AuthService {
       ),
     );
 
-    print('VK login status: ${response.statusCode}');
-    print('VK login body: ${response.body}');
-
     if (response.statusCode != 200) {
       throw Exception('VK login failed: ${response.body}');
     }
@@ -258,9 +225,7 @@ class AuthService {
 
   Future<void> saveVkToken(String vkToken) async {
     if (isLoggedIn) {
-      // to db
       Database.put('vkMusicToken', vkToken);
-      // to user acc
       final response = await authorizedRequest(
         (token) => http.post(
           Uri.parse('$baseUrlVk/token'),
@@ -271,7 +236,6 @@ class AuthService {
           body: jsonEncode({'token': vkToken, 'client': 'Kate'}),
         ),
       );
-      print("succ write to qdb");
       if (response.statusCode != 200) {
         throw Exception('Failed to save VK token');
       }
@@ -279,7 +243,6 @@ class AuthService {
     db.vkMusicToken.value = vkToken;
   }
 
-  // YANDEX
   Future<void> saveYandexToken(String yandexToken) async {
     if (isLoggedIn) {
       final response = await authorizedRequest(
@@ -297,7 +260,6 @@ class AuthService {
         throw Exception('Failed to save Yandex token: ${response.body}');
       }
     }
-
     db.yandexMusicToken.value = yandexToken;
   }
 
@@ -323,6 +285,7 @@ class AuthService {
         return null;
       }
     }
+    return null;
   }
 
   Future<void> deleteYandexToken() async {
@@ -368,8 +331,8 @@ extension AccountMethods on AuthService {
     }
   }
 
-  /// Отправить код подтверждения на текущий email.
-  Future<void> sendEmailVerification() async {
+  /// Повторно запросить код подтверждения на текущий email сессии
+  Future<void> resendVerificationCode(String email) async {
     final response = await authorizedRequest(
       (token) => http.post(
         Uri.parse('$baseUrl/send-email-verification'),
@@ -386,7 +349,8 @@ extension AccountMethods on AuthService {
     }
   }
 
-  Future<void> verifyEmail(String code) async {
+  /// Отправить введенный OTP код на верификацию
+  Future<void> verifyEmail({required String code, required String email}) async {
     final response = await authorizedRequest(
       (token) => http.post(
         Uri.parse('$baseUrl/verify-email'),
@@ -403,10 +367,7 @@ extension AccountMethods on AuthService {
     }
   }
 
-  Future<Map<String, dynamic>> updateProfile({
-    String? username,
-    String? email,
-  }) async {
+  Future<Map<String, dynamic>> updateProfile({String? username, String? email}) async {
     final payload = <String, String>{};
     if (username != null) payload['username'] = username;
     if (email != null) payload['email'] = email;
@@ -429,10 +390,7 @@ extension AccountMethods on AuthService {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<void> changePassword({
-    required String oldPassword,
-    required String newPassword,
-  }) async {
+  Future<void> changePassword({required String oldPassword, required String newPassword}) async {
     final response = await authorizedRequest(
       (token) => http.patch(
         Uri.parse('$baseUrl/me/password'),

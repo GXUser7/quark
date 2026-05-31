@@ -1,13 +1,12 @@
-// Flutter & Dart
 import 'dart:io';
 import 'dart:async';
+import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
-// Additional packages
 import 'package:hive/hive.dart';
 import 'package:logging/logging.dart';
 import 'package:file_picker/file_picker.dart';
@@ -20,6 +19,7 @@ import 'package:quark/services/dynamic_window_color_linux.dart';
 import 'package:quark/services/playlist_sync_services.dart';
 import 'package:quark/services/vkmusic_services.dart';
 import 'package:quark/services/ytmusic_services.dart';
+import 'package:quark/widgets/animated_glow.dart';
 import 'package:quark/widgets/main_page_platlists.dart';
 import 'package:quark/widgets/multi_search.dart';
 import 'package:quark/widgets/new_widgets.dart';
@@ -32,8 +32,7 @@ import 'package:quark/widgets/vkmusic_integration/vkmusic_playlist_widget.dart';
 import 'package:quark/widgets/yandex_music_integration/yandex_widgets.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:quark/widgets/ytmusic_integration/ytmusic_playlist_widget.dart';
-
-// Local files
+import 'package:url_launcher/url_launcher.dart';
 import '/objects/track.dart';
 import '/services/files.dart';
 import '/widgets/settings.dart';
@@ -47,12 +46,7 @@ import '/widgets/yandex_music_integration/yandex_login.dart';
 import '/widgets/yandex_music_integration/yandex_playlists_widget.dart';
 import '/widgets/auth.dart';
 import 'package:quark/services/auth_services.dart';
-import 'package:quark/widgets/multi_search.dart';
 import 'package:quark/l10n/app_localizations.dart';
-
-// TODO: fix bug while closing playtlist with iconbutton then if playlist was opened by mouseArea it wont close
-// TODO: Lister logger migration
-// TODO: REMOVE SETSTATE FROM BUILD METHODS
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,20 +69,48 @@ class Quark extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Locale?>(
       valueListenable: DatabaseStreamerService().appLocale,
-      builder: (context, savedLocale, child) {
-        return MaterialApp(
-          home: const MainPage(),
-          debugShowCheckedModeBanner: false,
-
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-
-          locale: savedLocale ?? const Locale('ru'),
+      builder: (context, savedLocale, _) {
+        return ValueListenableBuilder<ThemeMode>(
+          valueListenable: DatabaseStreamerService().appThemeMode,
+          builder: (context, themeMode, _) {
+            return MaterialApp(
+              home: const MainPage(),
+              debugShowCheckedModeBanner: false,
+              themeMode: themeMode,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: AppLocalizations.supportedLocales,
+              locale: savedLocale ?? const Locale('ru'),
+              theme: ThemeData(
+                useMaterial3: true,
+                brightness: Brightness.light,
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: const Color(0xFF6B52D4),
+                  brightness: Brightness.light,
+                  surface: const Color(0xFFF5F3FF),
+                ),
+                textTheme: GoogleFonts.plusJakartaSansTextTheme(
+                  ThemeData.light().textTheme,
+                ),
+              ),
+              darkTheme: ThemeData(
+                useMaterial3: true,
+                brightness: Brightness.dark,
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: const Color(0xFF9E86FF),
+                  brightness: Brightness.dark,
+                  surface: const Color(0xFF0C0A0E),
+                ),
+                textTheme: GoogleFonts.plusJakartaSansTextTheme(
+                  ThemeData.dark().textTheme,
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -133,11 +155,8 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
-  /// Reacting on pick folder button
   Future<void> pickFolder() async {
     try {
-      print('FilePicker registered: ${FilePicker.platform.runtimeType}');
-
       final bool rfa = DatabaseStreamerService().recursiveFilesAdding.value;
       String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
       if (selectedDirectory != null) {
@@ -150,25 +169,19 @@ class _MainPageState extends State<MainPage> {
             PlayerPlaylist(
               kind: 0,
               ownerUid: 0,
-              name: AppLocalizations.of(context)!.localeName,
+              name: "Local",
               tracks: result,
               source: PlaylistSource.local,
             ),
           );
-          final stopwatch = Stopwatch()..start();
           await AppDatabase().saveTracks(result);
-          stopwatch.stop();
-
-          print('Время выполнения: ${stopwatch.elapsedMilliseconds} мс');
-          print('Время выполнения: ${stopwatch.elapsedMicroseconds} мкс');
         }
       }
     } catch (e) {
-      log.shout('Unexcepted error while pickFolder()', e);
+      log.shout('Unexpected error while pickFolder()', e);
     }
   }
 
-  /// Reacting on close login button
   Future<void> closeLogin([bool? openPlaylists]) async {
     setState(() {
       loginView = false;
@@ -177,35 +190,22 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
-  /// Reacting on close playlist button
   Future<void> closePlaylist([bool? openPlaylists]) async {
-    setState(() {
-      playlistView = false;
-    });
+    setState(() => playlistView = false);
   }
 
-  /// Reacting on close settings button
   Future<void> closeSettings() async {
-    setState(() {
-      settingsView = false;
-    });
+    setState(() => settingsView = false);
   }
 
-  /// Reacting on close dragAndDrop button
   Future<void> closeCookieDragAndDrop() async {
-    setState(() {
-      dragAndDropView = false;
-    });
+    setState(() => dragAndDropView = false);
   }
 
-  /// Routing to playlist page
   Future<void> playlistRoute(PlayerPlaylist playlist) async {
-    final stopwatch = Stopwatch()..start();
     lastPlaylist = playlist;
-    print("------------------------------ UPDATING PLAYLIST INFO");
     Player.player.updatePlaylistInfo(PlaylistInfo.fromPlayerPlaylist(playlist));
     Player.player.updatePlaylist(playlist.tracks);
-    print("------------------------------ SEARCHING LAST TRAACK");
 
     PlayerTrack? foundTrack;
     if (lastTrackPath != null) {
@@ -218,13 +218,9 @@ class _MainPageState extends State<MainPage> {
     }
 
     final trackToPlay = foundTrack ?? playlist.tracks[0];
-
-    print(
-      "------------------------------ PLAYING CUSTOM - ${trackToPlay.filepath}",
-    );
     Player.player.pause();
     Player.player.playCustom(trackToPlay);
-    print("------------------------------ SEEKING");
+
     if (foundTrack != null) {
       if (Duration(seconds: DatabaseStreamerService().lastTrackPosition.value) <
           Player.player.durationNotifier.value) {
@@ -234,87 +230,61 @@ class _MainPageState extends State<MainPage> {
       }
     }
 
-    print(
-      '------------------------------ GETTING READY COSTS ${stopwatch.elapsedMilliseconds} ms',
-    );
-    print("------------------------------ PUSHING INTO");
-    stopwatch.stop();
+    if (!mounted) return;
     Navigator.push(
       context,
       CupertinoPageRoute(
-        settings: RouteSettings(name: "/player"),
+        settings: const RouteSettings(name: "/player"),
         builder: (context) =>
             PlaylistPage(playlist: playlist, yandexMusic: yandexMusic),
       ),
     );
-    print("------------------------------ PUSHED");
   }
 
-  /// Reaction on playlist restore button
   Future<void> playlistRestore() async {
     String token = DatabaseStreamerService().yandexMusicToken.value;
-    if (lastPlaylist == null) {
-      return;
-    }
-    bool inited = await yandexMusic.checkInit();
-    if (!inited) {
+    if (lastPlaylist == null) return;
+    bool isYMInited = await yandexMusic.checkInit();
+    if (!isYMInited) {
       yandexMusic = YandexMusic(token: token);
     }
-
     playlistRoute(lastPlaylist!);
   }
 
-  /// Update playlists from yandex music
   Future<void> ymUpdate() async {
     if (inited && userPlaylists.isNotEmpty) {
-      setState(() {
-        playlistView = true;
-      });
+      setState(() => playlistView = true);
       return;
     }
     try {
       if (!inited) {
         String token = DatabaseStreamerService().yandexMusicToken.value;
-
         if (token == '') {
-          setState(() {
-            loginView = true;
-          });
+          setState(() => loginView = true);
           return;
         }
 
         yandexMusic = YandexMusic(token: token);
-        log.warning('Trying to initialize yandex music instance...');
-
         await yandexMusic.init();
         inited = true;
         YandexMusicSingleton.init(yandexMusic);
       }
 
       if (userPlaylists.isEmpty) {
-        yandexMusic.usertracks.getPlaylistsWithLikes().then((playlists) async {
+        yandexMusic.usertracks.getPlaylistsWithLikes().then((playlists) {
           setState(() {
             userPlaylists = playlists;
             playlistView = true;
           });
         });
       } else {
-        setState(() {
-          playlistView = true;
-        });
+        setState(() => playlistView = true);
       }
     } on YandexMusicException catch (e) {
-      switch (e.type) {
-        case YandexMusicException.unauthorized:
-          log.warning(
-            'Yandex Music initizalization failed. Redirecting to login widget...',
-          );
-          setState(() {
-            loginView = true;
-          });
-        default:
-          log.shout('Unexcepted error while ymUpdate()', e);
-          return;
+      if (e.type == YandexMusicException.unauthorized) {
+        setState(() => loginView = true);
+      } else {
+        log.shout('Unexpected error while ymUpdate()', e);
       }
     }
   }
@@ -329,11 +299,9 @@ class _MainPageState extends State<MainPage> {
         ),
       );
       await Player.player.updatePlaylist(playlist.tracks);
-
       if (playlist.tracks.isNotEmpty) {
         await Player.player.playCustom(playlist.tracks.first);
       }
-
       if (!mounted) return;
       Navigator.push(
         context,
@@ -356,9 +324,7 @@ class _MainPageState extends State<MainPage> {
           name: playlist.name,
         ),
       );
-
       await Player.player.updatePlaylist(playlist.tracks);
-
       if (playlist.tracks.isNotEmpty) {
         await Player.player.playCustom(playlist.tracks.first);
       }
@@ -372,13 +338,11 @@ class _MainPageState extends State<MainPage> {
       );
     } catch (e) {
       Logger('MainPage').severe('VKMusic playlist error: $e');
-
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.playlistError(e.toString()),
-            ),
+            content: Text(l10n.playlistError(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -410,11 +374,10 @@ class _MainPageState extends State<MainPage> {
     } catch (e) {
       Logger('MainPage').severe('SoundCloud playlist error: $e');
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.playlistError(e.toString()),
-            ),
+            content: Text(l10n.playlistError(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -424,14 +387,11 @@ class _MainPageState extends State<MainPage> {
 
   Future<void> restoreLast() async {
     if (!mounted) return;
-
     final playlist = DatabaseStreamerService().lastPlaylist.value;
     if (playlist != null && !hasLatestPlaylist) {
       setState(() => hasLatestPlaylist = true);
     }
-
     lastTrackPath = DatabaseStreamerService().lastTrack.value;
-
     if (playlist != null) {
       final ls = await deserializePlaylist(playlist.cast<String, dynamic>());
       if (!mounted) return;
@@ -439,9 +399,7 @@ class _MainPageState extends State<MainPage> {
     }
   }
 
-  void _onDatabaseChanged() async {
-    await restoreLast();
-  }
+  void _onDatabaseChanged() async => await restoreLast();
 
   void addDatabaseListeners() {
     DatabaseStreamerService().yandexMusicToken.addListener(_ymListener);
@@ -464,26 +422,18 @@ class _MainPageState extends State<MainPage> {
   Future<void> _initYM(String token) async {
     if (inited) return;
     try {
-      log.info('Initializing Yandex Music...');
       yandexMusic = YandexMusic(token: token);
-
       if (AuthService().isLoggedIn) {
         await AuthService().saveYandexToken(token);
-      } else {
-        print('NOT logged in, skipping saveYandexToken');
-        print('accessToken: ${AuthService().accessToken}');
       }
-
       await yandexMusic.init();
       if (!mounted) return;
       setState(() => inited = true);
       YandexMusicSingleton.init(yandexMusic);
-      log.fine('Yandex Music initialized successfully.');
       if (DatabaseStreamerService().yandexMusicPreload.value) {
         unawaited(_playlistPreload());
       }
-    } on YandexMusicException {
-      log.warning('Yandex Music initialization failed.');
+    } catch (_) {
       inited = false;
     }
   }
@@ -502,12 +452,10 @@ class _MainPageState extends State<MainPage> {
     await DatabaseStreamerService().init();
     addDatabaseListeners();
     final token = DatabaseStreamerService().yandexMusicToken.value;
-
     await restoreLast();
     if (token.isNotEmpty) {
       await _initYM(token);
     }
-
     if (AuthService().isLoggedIn) {
       unawaited(_syncPlaylists());
     }
@@ -545,477 +493,901 @@ class _MainPageState extends State<MainPage> {
     super.dispose();
   }
 
-  Future<void> initLogger() async {
-    Logger.root.level = Level.ALL;
-    Logger.root.onRecord.listen((record) {
-      print(
-        '${record.loggerName} || ${record.level.name}: ${record.message} || ${record.error != null ? 'Error: ${record.error}' : ''}',
-      );
-      if (record.stackTrace != null) print(record.stackTrace);
-    });
-    log.finest('Hello world!');
-  }
-
   @override
   void initState() {
     super.initState();
-    initLogger();
     _databaseBootStrap();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final size = MediaQuery.of(context).size;
-    return Material(
-      child: Stack(
-        children: [
-          Center(
-            child: Container(
-              width: size.width,
-              height: size.height,
-              decoration: BoxDecoration(color: Color.fromRGBO(24, 24, 26, 1)),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
+    final isDark = theme.brightness == Brightness.dark;
+
+    return AnimatedGlowBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(context, l10n),
+                const SizedBox(height: 20),
+                if (lastPlaylist != null) ...[
+                  ResumePlaylistCard(
+                    playlistName: lastPlaylist!.name,
+                    trackCount: lastPlaylist!.tracks.length,
+                    onTap: () async => playlistRestore(),
+                  ),
+                  const SizedBox(height: 28),
+                ] else ...[
+                  _buildWelcomeHero(context, l10n),
+                  const SizedBox(height: 28),
+                ],
+                Text(
+                  'Music Services',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: theme.colorScheme.onSurface.withOpacity(0.9),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildServicesGrid(context, l10n),
+                const SizedBox(height: 36),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.library_music_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Your Playlists',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: theme.colorScheme.onSurface.withOpacity(0.9),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                LocalPlaylistsSection(
+                  key: _playlistsKey,
+                  playlistRoute: playlistRoute,
+                ),
+              ],
+            ),
+          ),
+        ),
+        bottomNavigationBar: _buildOverlays(),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withOpacity(0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Image.asset('assets/icon512.png', height: 40, width: 40),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      l10n.appTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: theme.colorScheme.onSurface,
+                        fontSize: isMobile ? 19 : 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      'where sound begins',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: theme.colorScheme.onSurface.withOpacity(0.55),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.asset('assets/icon512.png', height: 150, width: 150),
-                  const SizedBox(height: 15),
-                  Text(
-                    l10n.appTitle,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      decoration: TextDecoration.none,
-                      fontFamily: 'noto',
-                      fontWeight: FontWeight.w700,
+                  // Theme toggle button
+                  IconButton(
+                    onPressed: () {
+                      final current = DatabaseStreamerService().appThemeMode.value;
+                      DatabaseStreamerService().appThemeMode.value =
+                          current == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+                    },
+                    icon: Icon(
+                      isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                      size: 20,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: theme.colorScheme.onSurface.withOpacity(0.04),
+                      hoverColor: theme.colorScheme.onSurface.withOpacity(0.09),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(10),
                     ),
                   ),
-                  const SizedBox(height: 15),
-                  SizedBox(
-                    width: 400,
-                    child: Text(
-                      l10n.selectFolderHint,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        decoration: TextDecoration.none,
-                        fontWeight: FontWeight.normal,
-                        fontFamily: 'noto',
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // GnomeTile(
-                      //   onTap: () async {
-                      //     final confirm = await showDialog<bool>(
-                      //       context: context,
-                      //       builder: (ctx) => AlertDialog(
-                      //         backgroundColor: const Color(0xFF1C1C1E),
-                      //         title: Text(l10n.deleteAllPlaylists, style: TextStyle(color: Colors.white)),
-                      //         content: Text(l10n.deleteAllPlaylistsDesc, style: TextStyle(color: Colors.white70)),
-                      //         actions: [
-                      //           TextButton(
-                      //             onPressed: () => Navigator.pop(ctx, false),
-                      //             child: Text(l10n.cancel, style: TextStyle(color: Colors.white54)),
-                      //           ),
-                      //           TextButton(
-                      //             onPressed: () => Navigator.pop(ctx, true),
-                      //             child: Text(l10n.delete, style: TextStyle(color: Colors.redAccent)),
-                      //           ),
-                      //         ],
-                      //       ),
-                      //     );
-                      //     if (confirm != true) return;
-                      //     final raw = await AppDatabase().getAllPlaylistsWithTracks();
-                      //     for (final p in raw) {
-                      //       await AppDatabase().deletePlaylist(p.playlist.id);
-                      //     }
-                      //     setState(() {});
-                      //   },
-                      //   label: l10n.deleteAll,
-                      //   icon: Icons.delete_forever,
-                      //   color: const Color(0xFF8B0000),
-                      // ),
-                      if (lastPlaylist != null)
-                        Row(
-                          children: [
-                            GnomeTile(
-                              onTap: () async => playlistRestore(),
-                              label: l10n.restorePlaylist,
-                              icon: Icons.restore_rounded,
-                            ),
-                          ],
-                        ),
-
-                      GnomeTile(
-                        onTap: () async => await {pickFolder()},
-                        label: l10n.pickFolder,
-                        icon: Icons.folder,
-                      ),
-
-                      GnomeTile(
-                        onTap: () async => await ymUpdate(),
-                        label: l10n.yandexMusic,
-                        iconWidget: Image.asset(
-                          'assets/ym_w_alt.png',
-                          width: 30,
-                          height: 30,
-                        ),
-                      ),
-
-                      GnomeTile(
-                        onTap: () async => {
-                          setState(() {
-                            dragAndDropView = true;
-                          }),
-                        },
-                        label: l10n.youtubeMusic,
-                        iconWidget: Image.asset(
-                          'assets/y_w_alt.png',
-                          width: 30,
-                          height: 30,
-                        ),
-                      ),
-
-                      // VKMUSIC
-                      GnomeTile(
-                        onTap: () async => {
-                          await Navigator.push(
-                            context,
-                            CupertinoPageRoute(
-                              builder: (_) => VkAuthPage(
-                                onTokenReceived: (token) async {
-                                  try {
-                                    await AuthService().saveVkToken(token);
-                                  } catch (e) {
-                                    print('err: $e');
-                                  }
-                                },
-                              ),
-                            ),
+                  const SizedBox(width: 8),
+                  isMobile
+                      ? IconButton(
+                          onPressed: () async {
+                            if (!AuthService().isLoggedIn) {
+                              await Navigator.push(
+                                context,
+                                CupertinoPageRoute(builder: (_) => const AuthPage()),
+                              );
+                              if (AuthService().isLoggedIn) unawaited(_syncPlaylists());
+                            } else {
+                              await AuthService().logout();
+                            }
+                            setState(() {});
+                          },
+                          icon: Icon(
+                            AuthService().isLoggedIn
+                                ? Icons.logout_rounded
+                                : Icons.login_rounded,
+                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            size: 20,
                           ),
-                        },
-                        label: l10n.vkMusic,
-                        iconWidget: Image.asset(
-                          'assets/vk_w_alt.png',
-                          width: 30,
-                          height: 30,
-                        ),
-                      ),
-                      GnomeTile(
-                        onTap: () async {
-                          setState(() => soundCloudView = true);
-                        },
-                        label: l10n.soundCloud,
-                        iconWidget: Image.asset(
-                          'assets/soundcloud_w.png',
-                          width: 37,
-                          height: 37,
-                        ),
-                      ),
-                      GnomeTile(
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            CupertinoPageRoute(
-                              builder: (_) => MusicSearchWidget(
-                                onTracksChosen:
-                                    (tracks, {newPlaylistName, playlist}) =>
-                                        _handleTracksChosen(
-                                          tracks,
-                                          playlist: playlist,
-                                          newPlaylistName: newPlaylistName,
-                                        ),
-                              ),
+                          style: IconButton.styleFrom(
+                            backgroundColor:
+                                theme.colorScheme.onSurface.withOpacity(0.04),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          );
-                          _playlistsKey.currentState?.reload();
-                        },
-                        label: l10n.search,
-                        icon: Icons.search,
+                            padding: const EdgeInsets.all(10),
+                          ),
+                        )
+                      : SizedBox(
+                          width: 115,
+                          height: 38,
+                          child: GnomeStyleAuthButton(
+                            isLoggedIn: AuthService().isLoggedIn,
+                            onTap: () async {
+                              if (!AuthService().isLoggedIn) {
+                                await Navigator.push(
+                                  context,
+                                  CupertinoPageRoute(
+                                      builder: (_) => const AuthPage()),
+                                );
+                                if (AuthService().isLoggedIn)
+                                  unawaited(_syncPlaylists());
+                              } else {
+                                await AuthService().logout();
+                              }
+                              setState(() {});
+                            },
+                          ),
+                        ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => setState(() => settingsView = true),
+                    icon: Icon(
+                      Icons.settings_outlined,
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                      size: 20,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor:
+                          theme.colorScheme.onSurface.withOpacity(0.04),
+                      hoverColor: theme.colorScheme.onSurface.withOpacity(0.09),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ],
-                  ),
-
-                  LocalPlaylistsSection(
-                    key: _playlistsKey,
-                    playlistRoute: playlistRoute,
+                      padding: const EdgeInsets.all(10),
+                    ),
                   ),
                 ],
               ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildWelcomeHero(BuildContext context, AppLocalizations l10n) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.colorScheme.onSurface.withOpacity(0.04),
+            theme.colorScheme.onSurface.withOpacity(0.01),
+          ],
+        ),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Ready to listen?',
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
           ),
-
-          AnimatedSwitcher(
-            duration: Duration(milliseconds: 300),
-            child: loginView
-                ? GestureDetector(
-                    onTap: () => setState(() {}),
-                    child: Container(
-                      key: ValueKey('login'),
-                      color: Colors.black.withAlpha(25),
-                      child: Stack(
-                        children: [
-                          YandexLogin(closeView: closeLogin),
-                          Positioned(
-                            right: Platform.isAndroid ? 15 : 0,
-                            top: Platform.isAndroid ? 15 : 0,
-                            child: IconButton(
-                              onPressed: () =>
-                                  setState(() => loginView = false),
-                              icon: Icon(Icons.close, color: Colors.white70),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : SizedBox.shrink(key: ValueKey('empty')),
+          const SizedBox(height: 8),
+          Text(
+            l10n.selectFolderHint,
+            style: GoogleFonts.plusJakartaSans(
+              color: theme.colorScheme.onSurface.withOpacity(0.65),
+              fontSize: 14,
+              height: 1.45,
+            ),
           ),
+        ],
+      ),
+    );
+  }
 
-          AnimatedSwitcher(
-            duration: Duration(milliseconds: 300),
-            child: playlistView
-                ? GestureDetector(
-                    onTap: () => setState(() => playlistView = false),
-                    child: Container(
-                      key: ValueKey('playlist'),
-                      color: Colors.black.withAlpha(25),
-                      child: Stack(
-                        children: [
-                          GestureDetector(
-                            onTap: () {},
-                            child: YandexPlaylists(
-                              closeView: closePlaylist,
-                              yandexMusic: yandexMusic,
-                              playlistRouter: playlistRoute,
-                            ),
-                          ),
-                          Positioned(
-                            right: Platform.isAndroid ? 15 : 5,
-                            top: Platform.isAndroid ? 15 : 5,
-                            child: IconButton(
-                              onPressed: () =>
-                                  setState(() => playlistView = false),
-                              icon: Icon(Icons.close, color: Colors.white70),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : SizedBox.shrink(key: ValueKey('empty')),
-          ),
+  Widget _buildServicesGrid(BuildContext context, AppLocalizations l10n) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double width = constraints.maxWidth;
+        final int crossAxisCount = width > 700 ? 3 : 2;
+        final double spacing = 14.0;
+        final double cardWidth =
+            (width - (spacing * (crossAxisCount - 1))) / crossAxisCount;
 
-          AnimatedSwitcher(
-            duration: Duration(milliseconds: 300),
-            child: settingsView
-                ? GestureDetector(
-                    onTap: () => setState(() => settingsView = false),
-                    child: Container(
-                      color: Colors.black.withAlpha(25),
-                      child: Stack(
-                        children: [
-                          GestureDetector(
-                            onTap: () {},
-                            child: Settings(closeView: closeSettings),
-                          ),
-                          Positioned(
-                            right: Platform.isAndroid ? 15 : 5,
-                            top: Platform.isAndroid ? 20 : 10,
-                            child: IconButton(
-                              onPressed: () =>
-                                  setState(() => settingsView = false),
-                              icon: Icon(Icons.close, color: Colors.white70),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : SizedBox.shrink(key: ValueKey('empty')),
-          ),
-          AnimatedSwitcher(
-            duration: Duration(milliseconds: 300),
-            child: soundCloudView
-                ? GestureDetector(
-                    onTap: () => setState(() => soundCloudView = false),
-                    child: Container(
-                      color: Colors.black.withAlpha(25),
-                      child: Stack(
-                        children: [
-                          GestureDetector(
-                            onTap: () {},
-                            child: SoundCloudPlaylistsWidget(
-                              closeView: () {},
-                              playlistRouter: _onSoundCloudPlaylistSelected,
-                            ),
-                          ),
-                          Positioned(
-                            right: Platform.isAndroid ? 15 : 5,
-                            top: Platform.isAndroid ? 15 : 5,
-                            child: IconButton(
-                              onPressed: () =>
-                                  setState(() => soundCloudView = false),
-                              icon: Icon(Icons.close, color: Colors.white70),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : SizedBox.shrink(),
-          ),
-
-          // TO AUTH BUTTON
-          Positioned(
-            right: Platform.isAndroid ? 55 : 45,
-            top: Platform.isAndroid ? 15 : 10,
-            child: SizedBox(
-              width: 100,
-              height: 35,
-              child: GnomeStyleAuthButton(
-                isLoggedIn: AuthService().isLoggedIn,
-                onTap: () async {
-                  if (!AuthService().isLoggedIn) {
-                    await Navigator.push(
-                      context,
-                      CupertinoPageRoute(builder: (_) => AuthPage()),
-                    );
-                    if (AuthService().isLoggedIn) {
-                      unawaited(_syncPlaylists());
-                    }
-                  } else {
-                    await AuthService().logout();
-                  }
-                  setState(() {});
-                },
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            ExpressiveServiceCard(
+              width: cardWidth,
+              onTap: () async => await pickFolder(),
+              label: l10n.pickFolder,
+              icon: Icons.folder_open_rounded,
+              color: Colors.blueAccent,
+            ),
+            ExpressiveServiceCard(
+              width: cardWidth,
+              onTap: () async => await ymUpdate(),
+              label: l10n.yandexMusic,
+              iconWidget: Image.asset(
+                'assets/ym_w_alt.png',
+                width: 26,
+                height: 26,
               ),
+              color: const Color(0xFFFFCC00),
+              badge: inited ? "Active" : null,
             ),
-          ),
-
-          AnimatedSwitcher(
-            duration: Duration(milliseconds: 300),
-            child: dragAndDropView
-                ? GestureDetector(
-                    onTap: () => setState(() => dragAndDropView = false),
-                    child: Container(
-                      color: Colors.black.withAlpha(25),
-                      child: Stack(
-                        children: [
-                          GestureDetector(
-                            onTap: () {},
-                            child: _cookieFiles.isEmpty
-                                ? GlassDropZone(
-                                    closeView: closeCookieDragAndDrop,
-                                    onFileDropped: (files) {
-                                      setState(() => _cookieFiles = files);
-                                    },
-                                  )
-                                : YTMusicPlaylists(
-                                    cookieFile: _cookieFiles.first,
-                                    closeView: closeCookieDragAndDrop,
-                                    playlistRouter: _onYTMusicPlaylistSelected,
-                                  ),
-                          ),
-                          Positioned(
-                            right: Platform.isAndroid ? 15 : 5,
-                            top: Platform.isAndroid ? 15 : 5,
-                            child: IconButton(
-                              onPressed: () => setState(() {
-                                dragAndDropView = false;
-                                _cookieFiles = [];
-                              }),
-                              icon: Icon(Icons.close, color: Colors.white70),
-                            ),
-                          ),
-                        ],
+            ExpressiveServiceCard(
+              width: cardWidth,
+              onTap: () => setState(() => dragAndDropView = true),
+              label: l10n.youtubeMusic,
+              iconWidget: Image.asset(
+                'assets/y_w_alt.png',
+                width: 26,
+                height: 26,
+              ),
+              color: const Color(0xFFFF0000),
+            ),
+            ExpressiveServiceCard(
+              width: cardWidth,
+              onTap: () => setState(() => soundCloudView = true),
+              label: l10n.soundCloud,
+              iconWidget: Image.asset(
+                'assets/soundcloud_w.png',
+                width: 32,
+                height: 32,
+              ),
+              color: const Color(0xFFFF5500),
+            ),
+            ExpressiveServiceCard(
+              width: cardWidth,
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (_) => MusicSearchWidget(
+                      onTracksChosen: (tracks, {newPlaylistName, playlist}) =>
+                          _handleTracksChosen(
+                        tracks,
+                        playlist: playlist,
+                        newPlaylistName: newPlaylistName,
                       ),
                     ),
-                  )
-                : SizedBox.shrink(),
+                  ),
+                );
+                _playlistsKey.currentState?.reload();
+              },
+              label: l10n.search,
+              icon: Icons.search_rounded,
+              color: Colors.tealAccent,
+            ),
+            ExpressiveServiceCard(
+              width: cardWidth,
+              onTap: () async {
+                final Uri url = Uri.parse('https://github.com/z3nsh0w/quark/');
+                if (await canLaunchUrl(url)) await launchUrl(url);
+              },
+              label: 'Мы на GitHub',
+              icon: Icons.code_rounded,
+              color: const Color(0xFFF0F6FC),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildOverlays() {
+    return Stack(
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: loginView
+              ? GlassOverlay(
+                  key: const ValueKey('login'),
+                  onClose: () => setState(() => loginView = false),
+                  child: YandexLogin(closeView: closeLogin),
+                )
+              : const SizedBox.shrink(key: ValueKey('empty_login')),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: playlistView
+              ? GlassOverlay(
+                  key: const ValueKey('playlist'),
+                  onClose: () => setState(() => playlistView = false),
+                  child: YandexPlaylists(
+                    closeView: closePlaylist,
+                    yandexMusic: yandexMusic,
+                    playlistRouter: playlistRoute,
+                  ),
+                )
+              : const SizedBox.shrink(key: ValueKey('empty_playlist')),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: settingsView
+              ? GlassOverlay(
+                  key: const ValueKey('settings'),
+                  onClose: () => setState(() => settingsView = false),
+                  child: Settings(closeView: closeSettings),
+                )
+              : const SizedBox.shrink(key: ValueKey('empty_settings')),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: soundCloudView
+              ? GlassOverlay(
+                  key: const ValueKey('soundcloud'),
+                  onClose: () => setState(() => soundCloudView = false),
+                  child: SoundCloudPlaylistsWidget(
+                    closeView: () {},
+                    playlistRouter: _onSoundCloudPlaylistSelected,
+                  ),
+                )
+              : const SizedBox.shrink(key: ValueKey('empty_soundcloud')),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: dragAndDropView
+              ? GlassOverlay(
+                  key: const ValueKey('dragAndDrop'),
+                  onClose: () => setState(() {
+                    dragAndDropView = false;
+                    _cookieFiles = [];
+                  }),
+                  child: _cookieFiles.isEmpty
+                      ? GlassDropZone(
+                          closeView: closeCookieDragAndDrop,
+                          onFileDropped: (files) =>
+                              setState(() => _cookieFiles = files),
+                        )
+                      : YTMusicPlaylists(
+                          cookieFile: _cookieFiles.first,
+                          closeView: closeCookieDragAndDrop,
+                          playlistRouter: _onYTMusicPlaylistSelected,
+                        ),
+                )
+              : const SizedBox.shrink(key: ValueKey('empty_drag_drop')),
+        ),
+      ],
+    );
+  }
+}
+
+class ExpressiveServiceCard extends StatefulWidget {
+  final VoidCallback onTap;
+  final String label;
+  final IconData? icon;
+  final Widget? iconWidget;
+  final Color color;
+  final String? badge;
+  final double width;
+
+  const ExpressiveServiceCard({
+    super.key,
+    required this.onTap,
+    required this.label,
+    this.icon,
+    this.iconWidget,
+    required this.color,
+    this.badge,
+    required this.width,
+  });
+
+  @override
+  State<ExpressiveServiceCard> createState() => _ExpressiveServiceCardState();
+}
+
+class _ExpressiveServiceCardState extends State<ExpressiveServiceCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final accentColor = widget.color;
+    final baseColor = theme.colorScheme.onSurface.withOpacity(isDark ? 0.12 : 0.06);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered ? 1.03 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: widget.width,
+          height: 120,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: _isHovered
+                  ? [
+                      accentColor.withOpacity(0.18),
+                      accentColor.withOpacity(0.06),
+                    ]
+                  : [baseColor, baseColor.withOpacity(0.03)],
+            ),
+            border: Border.all(
+              color: _isHovered
+                  ? accentColor.withOpacity(0.4)
+                  : theme.colorScheme.outlineVariant.withOpacity(isDark ? 0.3 : 0.5),
+              width: 1.2,
+            ),
+            boxShadow: [
+              if (_isHovered)
+                BoxShadow(
+                  color: accentColor.withOpacity(0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+            ],
           ),
-          if (playlistView == false &&
-              loginView == false &&
-              settingsView == false &&
-              dragAndDropView == false &&
-              soundCloudView == false)
-            Positioned(
-              right: Platform.isAndroid ? 15 : 5,
-              top: Platform.isAndroid ? 30 : 5,
-              child: IconButton(
-                onPressed: () {
-                  setState(() {
-                    settingsView = true;
-                  });
-                },
-                icon: Icon(
-                  Icons.settings,
-                  color: Color.fromRGBO(255, 255, 255, 0.8),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: BorderRadius.circular(20),
+              splashColor: accentColor.withOpacity(0.15),
+              highlightColor: accentColor.withOpacity(0.06),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _isHovered
+                                ? accentColor.withOpacity(0.15)
+                                : theme.colorScheme.onSurface.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: widget.iconWidget ??
+                              Icon(
+                                widget.icon,
+                                color: _isHovered
+                                    ? accentColor
+                                    : theme.colorScheme.onSurface.withOpacity(0.8),
+                                size: 22,
+                              ),
+                        ),
+                        if (widget.badge != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: accentColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: accentColor.withOpacity(0.4),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              widget.badge!,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: isDark ? Colors.white : Colors.black87,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 9,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    Text(
+                      widget.label,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: theme.colorScheme.onSurface.withOpacity(0.9),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-        ],
+          ),
+        ),
       ),
     );
   }
 }
 
-Material _mainPageButton(Function() onTap, String text) {
-  return Material(
-    color: Colors.transparent,
-    borderRadius: BorderRadius.circular(15),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Container(
-        height: 45,
-        width: 350,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: Color.fromARGB(6, 255, 255, 255),
-          border: Border.all(width: 1, color: Colors.white.withAlpha(50)),
-        ),
-        child: Center(
-          child: Text(
-            text,
-            style: TextStyle(color: Colors.white, fontSize: 18),
+class ResumePlaylistCard extends StatefulWidget {
+  final VoidCallback onTap;
+  final String playlistName;
+  final int trackCount;
+
+  const ResumePlaylistCard({
+    super.key,
+    required this.onTap,
+    required this.playlistName,
+    required this.trackCount,
+  });
+
+  @override
+  State<ResumePlaylistCard> createState() => _ResumePlaylistCardState();
+}
+
+class _ResumePlaylistCardState extends State<ResumePlaylistCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered ? 1.015 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                primaryColor.withOpacity(0.18),
+                primaryColor.withOpacity(0.04),
+              ],
+            ),
+            border: Border.all(
+              color: _isHovered
+                  ? primaryColor.withOpacity(0.4)
+                  : primaryColor.withOpacity(0.12),
+              width: 1.5,
+            ),
+            boxShadow: [
+              if (_isHovered)
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: BorderRadius.circular(24),
+              splashColor: primaryColor.withOpacity(0.15),
+              highlightColor: primaryColor.withOpacity(0.05),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20.0,
+                  vertical: 18.0,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: primaryColor.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.play_arrow_rounded,
+                        color: primaryColor,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "RESUME LISTEN",
+                            style: GoogleFonts.plusJakartaSans(
+                              color: primaryColor.withOpacity(0.85),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            widget.playlistName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: theme.colorScheme.onSurface,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "${widget.trackCount} tracks",
+                            style: GoogleFonts.plusJakartaSans(
+                              color: theme.colorScheme.onSurface.withOpacity(0.55),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: theme.colorScheme.onSurface.withOpacity(0.3),
+                      size: 24,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-Widget _serviceIconTile({required Function() onTap, required IconData icon}) {
-  return Material(
-    color: Colors.transparent,
-    borderRadius: BorderRadius.circular(20),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      splashColor: Colors.white.withAlpha(20),
-      highlightColor: Colors.white.withAlpha(12),
-      child: Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.white.withAlpha(15),
-          border: Border.all(width: 1, color: Colors.white.withAlpha(30)),
-        ),
-        child: Center(
-          child: Icon(icon, color: Colors.white.withOpacity(0.75), size: 28),
+class GlassOverlay extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onClose;
+
+  const GlassOverlay({super.key, required this.child, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      color: Colors.black.withOpacity(isDark ? 0.65 : 0.35),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Stack(
+          children: [
+            GestureDetector(
+              onTap: onClose,
+              behavior: HitTestBehavior.opaque,
+              child: const SizedBox.expand(),
+            ),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 620,
+                  maxHeight: 720,
+                ),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF131118).withOpacity(0.82)
+                        : Colors.white.withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant.withOpacity(0.4),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.4 : 0.15),
+                        blurRadius: 32,
+                        offset: const Offset(0, 16),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: child,
+                      ),
+                      Positioned(
+                        right: 14,
+                        top: 14,
+                        child: IconButton(
+                          onPressed: onClose,
+                          icon: Icon(
+                            Icons.close_rounded,
+                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            size: 20,
+                          ),
+                          style: IconButton.styleFrom(
+                            backgroundColor:
+                                theme.colorScheme.onSurface.withOpacity(0.04),
+                            hoverColor:
+                                theme.colorScheme.onSurface.withOpacity(0.09),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.all(8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+class WarningMessage extends StatelessWidget {
+  final String messageHeader;
+  final String messageDiscription;
+  final List<String> buttons;
+  final int transparency;
+  final Color color;
+  final Color? borderColor;
+
+  const WarningMessage({
+    super.key,
+    required this.messageHeader,
+    required this.messageDiscription,
+    required this.buttons,
+    this.transparency = 15,
+    this.color = Colors.white,
+    this.borderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      backgroundColor: transparency > 200
+          ? color.withOpacity(0.85)
+          : theme.colorScheme.surfaceContainerHigh,
+      title: Text(
+        messageHeader,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+      content: messageDiscription.isNotEmpty
+          ? Text(messageDiscription, textAlign: TextAlign.center)
+          : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: borderColor != null
+            ? BorderSide(color: borderColor!)
+            : BorderSide.none,
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actionsOverflowDirection: VerticalDirection.down,
+      actions: buttons.map((text) {
+        return SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonal(
+            onPressed: () => Navigator.of(context).pop(buttons.indexOf(text)),
+            style: FilledButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(
+              text,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
 }
 
 Future<void> _handleTracksChosen(
@@ -1030,12 +1402,9 @@ Future<void> _handleTracksChosen(
 
   if (newPlaylistName != null && newPlaylistName.isNotEmpty) {
     playlistId = await dbInstance.createPlaylist(newPlaylistName);
-    debugPrint('Created playlist: "$newPlaylistName"');
   } else if (playlist != null) {
     playlistId = playlist.playlist.id;
-    debugPrint('Using playlist: "${playlist.playlist.title}"');
   } else {
-    debugPrint('No target playlist specified');
     return;
   }
 
@@ -1057,18 +1426,12 @@ Future<void> _handleTracksChosen(
       sourceId = track.videoId;
       uniquePath = 'youtube:${track.videoId}';
       coverUrl = track.cover;
-    } else if (track is SpotifyTrack) {
-      source = 'spotify';
-      sourceId = track.spotifyId;
-      uniquePath = 'spotify:${track.spotifyId}';
-      coverUrl = track.cover != 'none' ? track.cover : null;
     } else if (track is LocalTrack && track.filepath.startsWith('sc:')) {
       source = 'soundcloud';
       sourceId = track.filepath.replaceFirst('sc:', '');
       uniquePath = track.filepath;
       coverUrl = track.cover != 'none' ? track.cover : null;
     } else {
-      // local or vk(parasha)
       uniquePath = track.filepath.isNotEmpty
           ? track.filepath
           : '${track.title}_${track.artists.join('_')}';
@@ -1098,21 +1461,16 @@ Future<void> _handleTracksChosen(
   });
 
   for (final track in tracks) {
-    String uniquePath;
-    if (track is YandexMusicTrack) {
-      uniquePath = 'yandex:${track.track.id}';
-    } else if (track is YTMusicTrack) {
-      uniquePath = 'youtube:${track.videoId}';
-    } else if (track is SpotifyTrack) {
-      uniquePath = 'spotify:${track.spotifyId}';
-    } else {
-      uniquePath = track.filepath;
-    }
+    String uniquePath = track is YandexMusicTrack
+        ? 'yandex:${track.track.id}'
+        : track is YTMusicTrack
+            ? 'youtube:${track.videoId}'
+            : track.filepath;
 
     final knownTrack = await (dbInstance.select(
       dbInstance.knownTracks,
-    )..where((t) => t.path.equals(uniquePath))).getSingleOrNull();
-
+    )..where((t) => t.path.equals(uniquePath)))
+        .getSingleOrNull();
     if (knownTrack != null) {
       await dbInstance.insertTrackIntoPlaylist(playlistId, knownTrack.id);
     }

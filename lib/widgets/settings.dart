@@ -27,13 +27,13 @@ class _SettingsState extends State<Settings> {
   
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!; // ✅ Локализация
+    final l10n = AppLocalizations.of(context)!; 
     final size = MediaQuery.of(context).size;
     
     return Center(
       child: Container(
         width: min(size.width * 0.92, 800),
-        height: min(size.height * 0.92, 510),
+
         decoration: BoxDecoration(
           borderRadius: BorderRadius.all(Radius.circular(15)),
           color: Color.fromARGB(0, 255, 255, 255),
@@ -47,10 +47,6 @@ class _SettingsState extends State<Settings> {
               height: min(size.height * 0.92, 1036),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
-                  width: 1,
-                ),
                 borderRadius: const BorderRadius.all(Radius.circular(20)),
                 gradient: LinearGradient(
                   begin: Alignment.topRight,
@@ -73,7 +69,7 @@ class _SettingsState extends State<Settings> {
                         }),
                         behavior: HitTestBehavior.opaque,
                         child: Text(
-                          l10n.preferences, // ✅ 'Preferences' → локализовано
+                          l10n.preferences,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 15,
@@ -83,7 +79,6 @@ class _SettingsState extends State<Settings> {
                       ),
                     ),
 
-                    // 🌍 Выбор языка (добавлено)
                     Padding(
                       padding: EdgeInsetsGeometry.only(left: 35, right: 35),
                       child: Row(
@@ -146,10 +141,8 @@ class _SettingsState extends State<Settings> {
                             ],
                             onChanged: (Locale? newLocale) async {
                               if (newLocale != null) {
-                                // Сохраняем выбор в настройках
                                 await DatabaseStreamerService()
                                     .setAppLocale(newLocale);
-                                // Перезагружаем интерфейс
                                 if (mounted) {
                                   setState(() {});
                                 }
@@ -167,7 +160,7 @@ class _SettingsState extends State<Settings> {
                       Padding(
                         padding: EdgeInsetsGeometry.only(left: 35),
                         child: Text(
-                          l10n.debug, // ✅ 'Debug'
+                          l10n.debug, 
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -182,7 +175,7 @@ class _SettingsState extends State<Settings> {
                     Padding(
                       padding: EdgeInsetsGeometry.only(left: 35),
                       child: Text(
-                        l10n.main, // ✅ 'Main'
+                        l10n.main, 
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -198,7 +191,7 @@ class _SettingsState extends State<Settings> {
                     Padding(
                       padding: EdgeInsetsGeometry.only(left: 35),
                       child: Text(
-                        l10n.yandexMusic, // ✅ 'Yandex Music'
+                        l10n.yandexMusic, 
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 14,

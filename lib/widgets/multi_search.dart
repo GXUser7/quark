@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:quark/objects/playlist.dart';
 import 'package:quark/objects/track.dart';
 import 'package:quark/services/auth_services.dart';
@@ -22,8 +23,7 @@ class MusicSearchWidget extends StatefulWidget {
     List<PlayerTrack> tracks, {
     String? newPlaylistName,
     db.PlaylistWithTracks? playlist,
-  })
-  onTracksChosen;
+  }) onTracksChosen;
 
   final db.PlaylistWithTracks? initialPlaylist;
 
@@ -37,21 +37,18 @@ class MusicSearchWidget extends StatefulWidget {
   State<MusicSearchWidget> createState() => _MusicSearchWidgetState();
 }
 
-class _MusicSearchWidgetState extends State<MusicSearchWidget>
-    with TickerProviderStateMixin {
+class _MusicSearchWidgetState extends State<MusicSearchWidget> with TickerProviderStateMixin {
   _MusicService _service = _MusicService.yandex;
   final _searchController = TextEditingController();
   Timer? _debounce;
 
   List<PlayerTrack> _allLocalTracks = [];
-
   List<PlayerTrack> _results = [];
   final Set<PlayerTrack> _selected = {};
   bool _loading = false;
   String? _error;
 
   final _dio = Dio();
-
   List<db.PlaylistWithTracks> _existingPlaylists = [];
 
   @override
@@ -106,38 +103,31 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
     } catch (e) {
       if (mounted) {
         String message = e.toString();
-
         if (message.contains('YandexMusicInitialization') ||
             message.contains('Account ID was not found') ||
             message.contains('serviceAvailable: false')) {
-          message =
-              'Yandex Music is not available. Check your token or login again.';
-        } else if (message.contains('401') ||
-            message.contains('unauthorized')) {
-          message = 'Session expired. Please login again.';
-        } else if (message.contains('SocketException') ||
-            message.contains('Failed host lookup')) {
-          message = 'No internet connection.';
+          message = 'Яндекс Музыка недоступна. Проверьте токен или войдите снова.';
+        } else if (message.contains('401') || message.contains('unauthorized')) {
+          message = 'Сессия устарела. Пожалуйста, авторизуйтесь заново.';
+        } else if (message.contains('SocketException') || message.contains('Failed host lookup')) {
+          message = 'Отсутствует подключение к интернету.';
         }
-
         setState(() => _error = message);
       }
-    } finally {
+    } 
       if (mounted) setState(() => _loading = false);
-    }
+    
   }
 
   Future<List<PlayerTrack>> _searchYandex(String query) async {
     if (!YandexMusicSingleton.inited) {
-      throw Exception('Yandex Music is not connected. Please login first.');
+      throw Exception('Яндекс Музыка не подключена.');
     }
-
     final result = await YandexMusicSingleton.instance.search.search(
       query,
       withBestResults: true,
       pageSize: 20,
     );
-
     final tracks = <PlayerTrack>[];
     if (result.bestTrack != null) {
       tracks.add(YandexMusicTrack.fromYMTrack(result.bestTrack!));
@@ -166,12 +156,9 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
     return list.map((e) {
       final json = e as Map<String, dynamic>;
       final videoId = json['id']?.toString() ?? '';
-
-      // ← строим thumbnail из videoId если сервер не вернул
       if (json['thumbnail'] == null && videoId.isNotEmpty) {
         json['thumbnail'] = 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
       }
-
       return YTMusicTrack.fromApiTrack(json);
     }).toList();
   }
@@ -191,11 +178,7 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
   Future<List<PlayerTrack>> _searchLocal(String query) async {
     final lower = query.toLowerCase();
     return _allLocalTracks
-        .where(
-          (t) =>
-              t.title.toLowerCase().contains(lower) ||
-              t.artists.any((a) => a.toLowerCase().contains(lower)),
-        )
+        .where((t) => t.title.toLowerCase().contains(lower) || t.artists.any((a) => a.toLowerCase().contains(lower)))
         .toList();
   }
 
@@ -206,21 +189,19 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
     });
     try {
       final known = await db.AppDatabase().getKnownTracks();
-      _allLocalTracks = known
-          .map((t) => LocalTrack.getFromDatabase(t))
-          .toList();
+      _allLocalTracks = known.map((t) => LocalTrack.getFromDatabase(t)).toList();
       if (mounted) setState(() => _results = _allLocalTracks);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
-    } finally {
+    } 
       if (mounted) setState(() => _loading = false);
-    }
+    
   }
 
   LocalTrack _vkSongToTrack(Map<String, dynamic> s) {
     return LocalTrack(
-      title: s['title']?.toString() ?? 'Unknown',
-      artists: [s['artist']?.toString() ?? 'Unknown'],
+      title: s['title']?.toString() ?? 'Неизвестно',
+      artists: [s['artist']?.toString() ?? 'Неизвестный исполнитель'],
       albums: [],
       filepath: s['url']?.toString() ?? '',
       coverType: s['thumb'] != null ? CoverType.url : CoverType.noCover,
@@ -230,10 +211,8 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
 
   Future<void> _addToExisting() async {
     if (_selected.isEmpty) return;
-
     final playlist = widget.initialPlaylist ?? await _showPlaylistPicker();
     if (playlist == null) return;
-
     await widget.onTracksChosen(_selected.toList(), playlist: playlist);
     if (mounted) setState(() => _selected.clear());
   }
@@ -249,9 +228,10 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
   Future<db.PlaylistWithTracks?> _showPlaylistPicker() async {
     return showModalBottomSheet<db.PlaylistWithTracks>(
       context: context,
-      backgroundColor: const Color(0xFF1C1C1E),
+      backgroundColor: const Color(0xFF0C0A0E),
+      barrierColor: Colors.black.withOpacity(0.6),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => _PlaylistPickerSheet(playlists: _existingPlaylists),
     );
@@ -259,40 +239,37 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
 
   Future<String?> _showNameDialog() async {
     final ctrl = TextEditingController();
+    final theme = Theme.of(context);
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
-        title: const Text(
-          'New playlist',
-          style: TextStyle(color: Colors.white),
+        backgroundColor: const Color(0xFF131118),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          'Новый плейлист',
+          style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          style: const TextStyle(color: Colors.white),
+          style: GoogleFonts.plusJakartaSans(color: Colors.white),
+          cursorColor: theme.colorScheme.primary,
           decoration: InputDecoration(
-            hintText: 'Playlist name',
-            hintStyle: TextStyle(color: Colors.white38),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.white24),
-            ),
-            focusedBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.white60),
-            ),
+            hintText: 'Название плейлиста',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white54),
-            ),
+            child: Text('Отмена', style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontWeight: FontWeight.w600)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text),
-            child: const Text('Create', style: TextStyle(color: Colors.white)),
+            child: Text('Создать', style: GoogleFonts.plusJakartaSans(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -301,26 +278,30 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black,
-      child: Center(
-        child: Container(
-          width: 560,
-          height: MediaQuery.of(context).size.height * 0.85,
-          decoration: BoxDecoration(
-            color: const Color(0xFF141416),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.6),
-                blurRadius: 40,
-                offset: const Offset(0, 20),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+    final theme = Theme.of(context);
+    final isMobile = MediaQuery.of(context).size.width < 650;
+
+    return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
+      body: SafeArea(
+        child: Center(
+          child: Container(
+            width: isMobile ? double.infinity : 560,
+            height: isMobile ? double.infinity : MediaQuery.of(context).size.height * 0.85,
+            margin: isMobile ? EdgeInsets.zero : const EdgeInsets.symmetric(vertical: 24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0C0A0E),
+              borderRadius: BorderRadius.circular(isMobile ? 0 : 24),
+              border: isMobile ? null : Border.all(color: Colors.white.withOpacity(0.06), width: 1.2),
+              boxShadow: [
+                if (!isMobile)
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 32,
+                    offset: const Offset(0, 16),
+                  ),
+              ],
+            ),
             child: Column(
               children: [
                 _buildHeader(),
@@ -337,22 +318,26 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 16, 0),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 8, 4),
       child: Row(
         children: [
-          const Text(
-            'Add tracks',
-            style: TextStyle(
+          Text(
+            'Добавление треков',
+            style: GoogleFonts.plusJakartaSans(
               color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              fontFamily: 'noto',
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
             ),
           ),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+            icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white.withOpacity(0.03),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             onPressed: () => Navigator.maybePop(context),
           ),
         ],
@@ -361,49 +346,40 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
   }
 
   Widget _buildServiceSelector() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
+    return SizedBox(
+      height: 54,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
           _ServiceChip(
             label: 'Yandex',
             selected: _service == _MusicService.yandex,
             color: const Color(0xFFFFCC00),
-            onTap: () => setState(() {
-              _service = _MusicService.yandex;
-              _results = [];
-            }),
+            onTap: () => setState(() { _service = _MusicService.yandex; _results = []; }),
           ),
           const SizedBox(width: 8),
           _ServiceChip(
             label: 'YouTube',
             selected: _service == _MusicService.youtube,
             color: const Color(0xFFFF0000),
-            onTap: () => setState(() {
-              _service = _MusicService.youtube;
-              _results = [];
-            }),
+            onTap: () => setState(() { _service = _MusicService.youtube; _results = []; }),
           ),
           const SizedBox(width: 8),
-          _ServiceChip(
-            label: 'VK',
-            selected: _service == _MusicService.vk,
-            color: const Color(0xFF0077FF),
-            onTap: () => setState(() {
-              _service = _MusicService.vk;
-              _results = [];
-            }),
-          ),
+          // _ServiceChip(
+          //   label: 'VK',
+          //   selected: _service == _MusicService.vk,
+          //   color: const Color(0xFF0077FF),
+          //   onTap: () => setState(() { _service = _MusicService.vk; _results = []; }),
+          // ),
           const SizedBox(width: 8),
           _ServiceChip(
-            label: 'Local',
+            label: 'Локальные',
             selected: _service == _MusicService.local,
-            color: const Color.fromARGB(255, 255, 255, 255),
+            color: Colors.blueAccent,
             onTap: () {
-              setState(() {
-                _service = _MusicService.local;
-                _results = [];
-              });
+              setState(() { _service = _MusicService.local; _results = []; });
               _loadLocalTracks();
             },
           ),
@@ -412,10 +388,7 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
             label: 'SoundCloud',
             selected: _service == _MusicService.soundcloud,
             color: const Color(0xFFFF5500),
-            onTap: () => setState(() {
-              _service = _MusicService.soundcloud;
-              _results = [];
-            }),
+            onTap: () => setState(() { _service = _MusicService.soundcloud; _results = []; }),
           ),
           if (DatabaseStreamerService().spotifySearch.value) ...[
             const SizedBox(width: 8),
@@ -423,10 +396,7 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
               label: 'Spotify',
               selected: _service == _MusicService.spotify,
               color: const Color(0xFF1DB954),
-              onTap: () => setState(() {
-                _service = _MusicService.spotify;
-                _results = [];
-              }),
+              onTap: () => setState(() { _service = _MusicService.spotify; _results = []; }),
             ),
           ],
         ],
@@ -435,27 +405,24 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
   }
 
   Widget _buildSearchField() {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: TextField(
         controller: _searchController,
         onChanged: _onQueryChanged,
-        style: const TextStyle(color: Colors.white, fontSize: 15),
-        cursorColor: Colors.white60,
+        style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 15),
+        cursorColor: theme.colorScheme.primary,
         decoration: InputDecoration(
-          hintText: 'Search tracks…',
-          hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.3),
-            fontSize: 15,
+          hintText: 'Поиск треков или исполнителей…',
+          hintStyle: GoogleFonts.plusJakartaSans(
+            color: Colors.white.withOpacity(0.25),
+            fontSize: 14,
           ),
-          prefixIcon: Icon(Icons.search, color: Colors.white38, size: 20),
+          prefixIcon: Icon(Icons.search_rounded, color: Colors.white.withOpacity(0.3), size: 20),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(
-                    Icons.clear,
-                    color: Colors.white38,
-                    size: 18,
-                  ),
+                  icon: const Icon(Icons.clear_rounded, color: Colors.white54, size: 18),
                   onPressed: () {
                     _searchController.clear();
                     _onQueryChanged('');
@@ -463,12 +430,20 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
                 )
               : null,
           filled: true,
-          fillColor: Colors.white.withOpacity(0.07),
+          fillColor: Colors.white.withOpacity(0.02),
+          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
           ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+          ),
         ),
       ),
     );
@@ -477,21 +452,24 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
   Widget _buildResults() {
     if (_loading) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.white30, strokeWidth: 2),
+        child: CupertinoActivityIndicator(color: Colors.white70, radius: 12),
       );
     }
     if (_error != null) {
-      return Center(
-        child: Text(
-          'Error: $_error',
-          style: const TextStyle(color: Colors.redAccent, fontSize: 13),
-          textAlign: TextAlign.center,
+      return Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Center(
+          child: Text(
+            _error!,
+            style: GoogleFonts.plusJakartaSans(color: const Color(0xFFFF453A), fontSize: 14, fontWeight: FontWeight.w500),
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     }
     if (_results.isEmpty && _searchController.text.isNotEmpty) {
-      return const Center(
-        child: Text('No results', style: TextStyle(color: Colors.white38)),
+      return Center(
+        child: Text('Ничего не найдено', style: GoogleFonts.plusJakartaSans(color: Colors.white24, fontSize: 15)),
       );
     }
     if (_results.isEmpty) {
@@ -499,13 +477,14 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.music_note, color: Colors.white12, size: 48),
+            Icon(Icons.music_note_rounded, color: Colors.white.withOpacity(0.04), size: 64),
             const SizedBox(height: 12),
             Text(
-              'Search for tracks',
-              style: TextStyle(
+              'Начните вводить поисковый запрос',
+              style: GoogleFonts.plusJakartaSans(
                 color: Colors.white.withOpacity(0.2),
                 fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -515,6 +494,7 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
 
     return ListView.builder(
       itemCount: _results.length,
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemBuilder: (ctx, i) {
         final track = _results[i];
@@ -538,31 +518,32 @@ class _MusicSearchWidgetState extends State<MusicSearchWidget>
 
   Widget _buildBottomBar() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
+        color: const Color(0xFF131118).withOpacity(0.4),
+        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
       ),
       child: Row(
         children: [
           Text(
-            '${_selected.length} selected',
-            style: TextStyle(
+            'Выбрано: ${_selected.length}',
+            style: GoogleFonts.plusJakartaSans(
               color: Colors.white.withOpacity(0.5),
-              fontSize: 13,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const Spacer(),
           _ActionButton(
-            label: 'New playlist',
-            icon: Icons.add,
+            label: 'Создать',
+            icon: Icons.add_rounded,
             onTap: _createNew,
             filled: false,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           _ActionButton(
-            label: 'Add to playlist',
-            icon: Icons.playlist_add,
+            label: 'В плейлист',
+            icon: Icons.playlist_add_rounded,
             onTap: _addToExisting,
             filled: true,
           ),
@@ -590,27 +571,25 @@ class _ServiceChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: selected
-              ? color.withOpacity(0.15)
-              : Colors.white.withOpacity(0.05),
+          color: selected ? color.withOpacity(0.12) : Colors.white.withOpacity(0.02),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected
-                ? color.withOpacity(0.6)
-                : Colors.white.withOpacity(0.1),
-            width: 1,
+            color: selected ? color.withOpacity(0.4) : Colors.white.withOpacity(0.06),
+            width: 1.2,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? color : Colors.white54,
-            fontSize: 13,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            fontFamily: 'noto',
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              color: selected ? color : Colors.white.withOpacity(0.4),
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -631,45 +610,42 @@ class _TrackResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return InkWell(
       onTap: onToggle,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        color: selected ? Colors.white.withOpacity(0.06) : Colors.transparent,
+        duration: const Duration(milliseconds: 200),
+        color: selected ? theme.colorScheme.primary.withOpacity(0.05) : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
-            // Cover
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(10),
               child: _TrackCover(track: track),
             ),
-            const SizedBox(width: 12),
-            // Title + artist
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     track.title,
-                    style: TextStyle(
-                      color: selected
-                          ? Colors.white
-                          : Colors.white.withOpacity(0.9),
+                    style: GoogleFonts.plusJakartaSans(
+                      color: selected ? Colors.white : Colors.white.withOpacity(0.9),
                       fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: 'noto',
+                      fontWeight: FontWeight.w700,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     track.artists.join(', '),
-                    style: TextStyle(
+                    style: GoogleFonts.plusJakartaSans(
                       color: Colors.white.withOpacity(0.4),
                       fontSize: 12,
-                      fontFamily: 'noto',
+                      fontWeight: FontWeight.w500,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -678,21 +654,20 @@ class _TrackResultTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Checkbox
             AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
+              duration: const Duration(milliseconds: 200),
               width: 22,
               height: 22,
               decoration: BoxDecoration(
-                color: selected ? Colors.white : Colors.transparent,
-                borderRadius: BorderRadius.circular(6),
+                color: selected ? theme.colorScheme.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: selected ? Colors.white : Colors.white24,
+                  color: selected ? theme.colorScheme.primary : Colors.white.withOpacity(0.12),
                   width: 1.5,
                 ),
               ),
               child: selected
-                  ? const Icon(Icons.check, color: Colors.black, size: 14)
+                  ? const Icon(Icons.check_rounded, color: Colors.white, size: 14)
                   : null,
             ),
           ],
@@ -709,12 +684,7 @@ class _TrackCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (track is LocalTrack && track.coverByted.isNotEmpty) {
-      return Image.memory(
-        track.coverByted,
-        width: 44,
-        height: 44,
-        fit: BoxFit.cover,
-      );
+      return Image.memory(track.coverByted, width: 46, height: 46, fit: BoxFit.cover);
     }
 
     final url = switch (track) {
@@ -723,29 +693,25 @@ class _TrackCover extends StatelessWidget {
       _ => track.cover,
     };
 
-    if (track is YTMusicTrack) {
-      print('YT cover url: "${(track as YTMusicTrack).cover}"');
-    }
-
     if (url == 'none' || url.isEmpty) {
       return Container(
-        width: 44,
-        height: 44,
-        color: Colors.white10,
-        child: const Icon(Icons.music_note, color: Colors.white24, size: 20),
+        width: 46,
+        height: 46,
+        color: Colors.white.withOpacity(0.04),
+        child: const Icon(Icons.music_note_rounded, color: Colors.white24, size: 20),
       );
     }
 
     return Image.network(
       url,
-      width: 44,
-      height: 44,
+      width: 46,
+      height: 46,
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => Container(
-        width: 44,
-        height: 44,
-        color: Colors.white10,
-        child: const Icon(Icons.music_note, color: Colors.white24, size: 20),
+        width: 46,
+        height: 46,
+        color: Colors.white.withOpacity(0.04),
+        child: const Icon(Icons.music_note_rounded, color: Colors.white24, size: 20),
       ),
     );
   }
@@ -766,27 +732,28 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: filled ? Colors.white : Colors.white.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: filled ? null : Border.all(color: Colors.white24),
+          color: filled ? theme.colorScheme.primary : Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: filled ? null : Border.all(color: Colors.white.withOpacity(0.06)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: filled ? Colors.black : Colors.white70),
+            Icon(icon, size: 18, color: filled ? Colors.white : Colors.white.withOpacity(0.7)),
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
-                color: filled ? Colors.black : Colors.white70,
+              style: GoogleFonts.plusJakartaSans(
+                color: filled ? Colors.white : Colors.white.withOpacity(0.7),
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'noto',
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -796,93 +763,94 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Playlist picker bottom sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _PlaylistPickerSheet extends StatelessWidget {
   final List<db.PlaylistWithTracks> playlists;
   const _PlaylistPickerSheet({required this.playlists});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 12),
-        Container(
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: Colors.white24,
-            borderRadius: BorderRadius.circular(2),
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C0A0E),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Choose playlist',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'noto',
+          const SizedBox(height: 18),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Выберите плейлист',
+                style: GoogleFonts.plusJakartaSans(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        if (playlists.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'No playlists yet',
-              style: TextStyle(color: Colors.white38),
+          const SizedBox(height: 8),
+          if (playlists.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Text(
+                'У вас пока нет плейлистов',
+                style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 340),
+              child: ListView.builder(
+                shrinkWrap: true,
+                physics: const BouncingScrollPhysics(),
+                itemCount: playlists.length,
+                itemBuilder: (ctx, i) {
+                  final p = playlists[i];
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.03),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      ),
+                      child: const Icon(Icons.queue_music_rounded, color: Colors.white54, size: 22),
+                    ),
+                    title: Text(
+                      p.playlist.title,
+                      style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '${p.tracks.length} треков',
+                        style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    onTap: () => Navigator.pop(ctx, p),
+                  );
+                },
+              ),
             ),
-          )
-        else
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 300),
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: playlists.length,
-              itemBuilder: (ctx, i) {
-                final p = playlists[i];
-                return ListTile(
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white10,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.queue_music,
-                      color: Colors.white38,
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    p.playlist.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'noto',
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${p.tracks.length} tracks',
-                    style: const TextStyle(color: Colors.white38, fontSize: 12),
-                  ),
-                  onTap: () => Navigator.pop(ctx, p),
-                );
-              },
-            ),
-          ),
-        const SizedBox(height: 16),
-      ],
+          const SizedBox(height: 24),
+        ],
+      ),
     );
   }
 }
