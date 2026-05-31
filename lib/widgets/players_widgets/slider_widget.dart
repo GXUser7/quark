@@ -132,7 +132,8 @@ class _SliderWidget extends State<ProgressWidget> {
               fontWeight: FontWeight.w300,
             ),
           ),
-          Expanded(
+          SizedBox(
+            width: widget.interactiveWidth,
             child: InteractiveSlider(
               controller: positionController,
               unfocusedHeight: 5,
