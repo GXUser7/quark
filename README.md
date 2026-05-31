@@ -8,28 +8,28 @@ Quark — это легковесный кроссплатформенный а�
 
 ```mermaid
 graph TD
-    subgraph Client [Клиентское приложение (Flutter)]
-        UI[Интерфейс пользователя]
-        LocalPlayer[Локальный аудио плеер]
-        AuthModule[Модуль авторизации]
+    subgraph Client ["Клиентское приложение (Flutter)"]
+        UI["Интерфейс пользователя"]
+        LocalPlayer["Локальный аудио плеер"]
+        AuthModule["Модуль авторизации"]
     end
 
-    subgraph Backend [Python FastAPI Backend]
-        API[FastAPI Router]
-        YTDLP[Интеграция yt-dlp]
-        Cache[LRU Cache с TTL]
-        DB_Adapter[Адаптер базы данных]
+    subgraph Backend ["Python FastAPI Backend"]
+        API["FastAPI Router"]
+        YTDLP["Интеграция yt-dlp"]
+        Cache["LRU Cache с TTL"]
+        DB_Adapter["Адаптер базы данных"]
     end
 
-    subgraph Database [База данных]
-        MongoDB[(MongoDB)]
+    subgraph Database ["База данных"]
+        MongoDB["MongoDB"]
     end
 
-    subgraph External [Внешние сервисы]
-        YM[Яндекс Музыка API]
-        SP[Spotify API]
-        YT[YouTube / YouTube Music]
-        SC[SoundCloud API]
+    subgraph External ["Внешние сервисы"]
+        YM["Яндекс Музыка API"]
+        SP["Spotify API"]
+        YT["YouTube / YouTube Music"]
+        SC["SoundCloud API"]
     end
 
     UI --> LocalPlayer
