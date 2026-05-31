@@ -1,56 +1,100 @@
-<h1 align="center">quark</h1>  
+# Quark
+
+Quark — это легковесный кроссплатформенный аудиоплеер. Клиентская часть разработана на Flutter, а вспомогательная серверная часть — на Python (FastAPI) с использованием СУБД MongoDB.
+
+## Архитектура и схема работы
+
+Приложение разделено на клиентскую часть (интерфейс и локальный плеер) и бэкенд, который обеспечивает интеграцию с веб-сервисами, кэширование запросов и синхронизацию данных.
+
+```mermaid
+graph TD
+    subgraph Client [Клиентское приложение (Flutter)]
+        UI[Интерфейс пользователя]
+        LocalPlayer[Локальный аудио плеер]
+        AuthModule[Модуль авторизации]
+    end
+
+    subgraph Backend [Python FastAPI Backend]
+        API[FastAPI Router]
+        YTDLP[Интеграция yt-dlp]
+        Cache[LRU Cache с TTL]
+        DB_Adapter[Адаптер базы данных]
+    end
+
+    subgraph Database [База данных]
+        MongoDB[(MongoDB)]
+    end
+
+    subgraph External [Внешние сервисы]
+        YM[Яндекс Музыка API]
+        SP[Spotify API]
+        YT[YouTube / YouTube Music]
+        SC[SoundCloud API]
+    end
+
+    UI --> LocalPlayer
+    UI --> AuthModule
+
+    UI -->|Запросы синхронизации и извлечения треков| API
+    API --> YTDLP
+    API --> Cache
+    API --> DB_Adapter
+    DB_Adapter --> MongoDB
+
+    UI -->|Прямая интеграция| YM
+    UI -->|Синхронизация| SP
+    API -->|Парсинг аудиопотоков| YT
+    API -->|Интеграция| YM
+    UI -->|Воспроизведение| SC
+```
+
+## Функциональные возможности
+
+### Локальное воспроизведение
+- Поддержка большинства аудиоформатов.
+- Регулировка скорости воспроизведения (ускорение и замедление аудиозаписей).
+- Сканирование локальных директорий с поддержкой рекурсивного поиска файлов.
+
+### Интеграция с музыкальными сервисами
+- Яндекс Музыка:
+  - Полная поддержка библиотеки (лайки, плейлисты, рекомендации).
+  - Выбор качества стриминга (Lossless, 256 kbps, 64 kbps).
+  - Кеширование треков и метаданных.
+  - Экспорт треков и плейлистов в формате FLAC с автоматической разметкой метаданных (ID3-теги, обложки).
+- Spotify: импорт и синхронизация пользовательских плейлистов.
+- YouTube / YouTube Music: поиск треков, извлечение аудиопотоков и воспроизведение плейлистов.
+- SoundCloud: интеграция для стриминга аудио.
+
+### Возможности FastAPI бэкенда
+- Проксирование запросов к YouTube и YouTube Music с использованием yt-dlp для обхода блокировок.
+- Многопоточный потокобезопасный in-memory LRU-кэш с поддержкой времени жизни (TTL) для снижения задержек и нагрузки на внешние сервисы.
+- Обработка авторизации, cookie-файлов и синхронизация учетных записей.
+- Работа с MongoDB для индексации и хранения истории воспроизведения, плейлистов и настроек пользователя.
+
+### Интерфейс и кастомизация
+- Динамическая адаптация цветовой гаммы интерфейса под обложку трека или тему системы.
+- Эффект размытия (glassmorphism) заднего фона и окон.
+- Полная локализация интерфейса на 10 языков (русский, английский, испанский, французский, немецкий, португальский, китайский, японский, корейский, турецкий).
+
+## Системные требования и зависимости
+
+### Windows
+- Требуется установленный Microsoft Visual C++ Runtime (vcredist.exe).
+- Для корректной работы WebView-авторизации на версиях Windows ниже 10 1809 требуется установленный Microsoft Edge WebView2 Runtime.
+- Рекомендуется установка MSVC для предотвращения аварийного завершения работы приложения при авторизации.
+
+### Linux
+- Требуется наличие библиотек libgtk-4-1+ или libqt6gui6 (обычно предустановлены в большинстве дистрибутивов).
+
+## Скриншоты
 
 <p align="center">
-  <img width="322" height="322" src="https://raw.githubusercontent.com/z3nsh0w/QUARK/refs/heads/main/assets/icon512.png" alt="quark Logo">
+  <img src="https://raw.githubusercontent.com/z3nsh0w/quark/refs/heads/main/assets/player.png" alt="Интерфейс плеера Quark" width="45%">
+  <img src="https://raw.githubusercontent.com/z3nsh0w/quark/refs/heads/main/assets/player_main_menu.png" alt="Главное меню плеера" width="45%">
 </p>
 
-<h1 align="center">
-  <strong>Lightweight, multifunctional and beautiful audio player</strong>
-</h1>
+## Разработчики
+- z3nsh0w (https://github.com/z3nsh0w)
+- aror (https://github.com/Aror1)
 
-<div align="center">
-
-![Release](https://img.shields.io/github/v/release/z3nsh0w/QUARK?style=flat-square)
-![Downloads](https://img.shields.io/github/downloads/z3nsh0w/QUARK/total?style=flat-square)
-![License](https://img.shields.io/github/license/z3nsh0w/QUARK?style=flat-square)
-
-</div>
-
-## Features
-
-- **Beautiful Design**
-- **Yandex Music Integration**
-- **Universal Audio Formats Support**
-- **Slowing down/Speed up tracks (Linux only)**
-- **Synchronization of local and Yandex tracks**
-
-### ⚠ Important Notes
-
-> [!WARNING]
-> 
-> **Windows**
-> 
-> If you do not have a freshly installed system and you have multiple programs installed, you most likely already have all of these packages installed.
-> 
-> + To use player you must to install [Microsoft Visual C++ Runtime](https://aka.ms/vs/17/release/vc_redist.x64.exe) (vcredist.exe).
-> 
-> + To use WebView authorization on Windows version below 10 1809, you need install [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/), otherwise you will have to enter the Yandex Music token manually.
->
-> + You may also install [MSVC](https://aka.ms/vc14/vc_redist.x64.exe). Otherwise, the application may crash without an error during authorization.
->
-> **Linux**
-> + Requires `libgtk-4-1+` or `libqt6gui6` (usually pre-installed on popular distributions)
-
-## Screenshots
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/z3nsh0w/quark/refs/heads/main/assets/player.png" alt="quark main player view" width="45%">
-  <img src="https://raw.githubusercontent.com/z3nsh0w/quark/refs/heads/main/assets/player_main_menu.png" alt="quark menu" width="45%">
-</p>
-
-
-### Made by PDG
-- [@z3nsh0w](https://github.com/z3nsh0w)
-- [@aror](https://github.com/Aror1)
-
-**This project is licensed under MIT license. See the `LICENSE` file for details.**
+Лицензия проекта: MIT. Подробности находятся в файле LICENSE.
