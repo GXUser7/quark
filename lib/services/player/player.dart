@@ -152,7 +152,11 @@ class _PlayerEngine {
           print('[PlayerEngine] play() called');
         default:
           print('[PlayerEngine] using audioPlayersPlayer');
-          await audioPlayersPlayer!.play(UrlSource(url));
+          String? mimeType;
+          if (url.contains('yandex.net') || url.contains('mds')) {
+            mimeType = url.contains('mp3') ? 'audio/mpeg' : 'audio/mp4';
+          }
+          await audioPlayersPlayer!.play(UrlSource(url, mimeType: mimeType));
       }
     } catch (e, st) {
       print('[PlayerEngine] playNet ERROR: $e');

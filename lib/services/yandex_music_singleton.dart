@@ -60,14 +60,17 @@ abstract class YandexMusicSingleton {
 
   static Future<void> updateLiked() async {
     try {
+      print('[YandexMusicService] Updating liked tracks...');
       final tracks = await instance.usertracks.getLiked();
+      print('[YandexMusicService] Successfully loaded ${tracks.length} liked tracks.');
       likedTracks.clear();
       likedTracksNotifier.value = tracks
           .map((toElement) => toElement.trackID)
           .toList();
       likedTracks.addAll(tracks);
-    } catch (e) {
-      Logger('YandexMusicService').shout('Failed to update liked tracks', e);
+    } catch (e, stack) {
+      print('[YandexMusicService] ERROR updating liked tracks: $e');
+      Logger('YandexMusicService').shout('Failed to update liked tracks', e, stack);
     }
   }
 
@@ -573,11 +576,18 @@ abstract class YandexMusicSingleton {
 
   static Future<void> updateUserPlaylists() async {
     try {
+      print('[YandexMusicService] Updating user playlists...');
       final playlist = await instance.usertracks.getPlaylistsWithLikes();
+      print('[YandexMusicService] Successfully loaded ${playlist.length} Yandex playlists.');
       playlists.clear();
       playlists.addAll(playlist);
-    } catch (e) {
-      Logger('YandexMusicService').shout('Failed to update user playlists');
+      for (var pl in playlist) {
+        print('[YandexMusicService] - Playlist: "${pl.title}" (UUID: ${pl.playlistUuid}, kind: ${pl.kind}, track count: ${pl.tracks.length})');
+      }
+      userPlaylistsNotifier.value = playlists;
+    } catch (e, stack) {
+      print('[YandexMusicService] ERROR updating user playlists: $e');
+      Logger('YandexMusicService').shout('Failed to update user playlists', e, stack);
     }
   }
 }

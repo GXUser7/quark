@@ -149,7 +149,19 @@ enum DatabaseKeys {
 
   /// ```String```
   /// Reserved for future Spotify stream resolver priority
-  spotifySourcePriority('spotify_source_priority');
+  spotifySourcePriority('spotify_source_priority'),
+
+  /// ```String```
+  /// Spotify OAuth access token
+  spotifyOauthToken('spotify_oauth_token'),
+
+  /// ```String```
+  /// Spotify OAuth refresh token
+  spotifyRefreshToken('spotify_refresh_token'),
+
+  /// ```bool```
+  /// Spotify login status
+  spotifyLoggedIn('spotify_logged_in');
   
 
   final String value;

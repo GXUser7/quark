@@ -43,6 +43,9 @@ import 'services/database/settings_engine.dart';
 import '/services/yandex_music_singleton.dart';
 import '/services/native_controls/native_control.dart';
 import '/widgets/yandex_music_integration/yandex_login.dart';
+import 'package:quark/services/spotify_services.dart';
+import 'package:quark/widgets/spotify_integration/spotify_login.dart';
+import 'package:quark/widgets/spotify_integration/spotify_playlists_widget.dart';
 import '/widgets/yandex_music_integration/yandex_playlists_widget.dart';
 import '/widgets/auth.dart';
 import 'package:quark/services/auth_services.dart';
@@ -126,6 +129,10 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   bool inited = false;
+  bool spotifyInited = false;
+  List<Map<String, dynamic>> spotifyPlaylists = [];
+  bool spotifyLoginView = false;
+  bool spotifyPlaylistView = false;
   String? lastTrackPath;
   bool loginView = false;
   bool playlistView = false;
@@ -286,6 +293,32 @@ class _MainPageState extends State<MainPage> {
       } else {
         log.shout('Unexpected error while ymUpdate()', e);
       }
+    }
+  }
+
+  Future<void> spotifyUpdate() async {
+    final db = DatabaseStreamerService();
+    if (spotifyInited && spotifyPlaylists.isNotEmpty) {
+      setState(() => spotifyPlaylistView = true);
+      return;
+    }
+    
+    final oauthToken = db.spotifyOauthToken.value;
+    if (oauthToken.isEmpty) {
+      setState(() => spotifyLoginView = true);
+      return;
+    }
+
+    try {
+      final playlists = await SpotifyService().getUserPlaylists();
+      setState(() {
+        spotifyPlaylists = playlists;
+        spotifyInited = true;
+        spotifyPlaylistView = true;
+      });
+    } catch (e) {
+      log.shout('Unexpected error while spotifyUpdate()', e);
+      setState(() => spotifyLoginView = true);
     }
   }
 
@@ -833,6 +866,18 @@ class _MainPageState extends State<MainPage> {
             ),
             ExpressiveServiceCard(
               width: cardWidth,
+              onTap: () async => await spotifyUpdate(),
+              label: 'Spotify',
+              iconWidget: const Icon(
+                Icons.spatial_audio_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
+              color: const Color(0xFF1DB954),
+              badge: spotifyInited ? "Active" : null,
+            ),
+            ExpressiveServiceCard(
+              width: cardWidth,
               onTap: () async {
                 await Navigator.push(
                   context,
@@ -941,6 +986,35 @@ class _MainPageState extends State<MainPage> {
                         ),
                 )
               : const SizedBox.shrink(key: ValueKey('empty_drag_drop')),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: spotifyLoginView
+              ? GlassOverlay(
+                  key: const ValueKey('spotify_login'),
+                  onClose: () => setState(() => spotifyLoginView = false),
+                  child: SpotifyLogin(closeView: () {
+                    setState(() {
+                      spotifyLoginView = false;
+                      spotifyUpdate();
+                    });
+                  }),
+                )
+              : const SizedBox.shrink(key: ValueKey('empty_spotify_login')),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: spotifyPlaylistView
+              ? GlassOverlay(
+                  key: const ValueKey('spotify_playlist'),
+                  onClose: () => setState(() => spotifyPlaylistView = false),
+                  child: SpotifyPlaylistsWidget(
+                    closeView: () => setState(() => spotifyPlaylistView = false),
+                    initialPlaylists: spotifyPlaylists,
+                    playlistRouter: playlistRoute,
+                  ),
+                )
+              : const SizedBox.shrink(key: ValueKey('empty_spotify_playlist')),
         ),
       ],
     );
@@ -1426,6 +1500,13 @@ Future<void> _handleTracksChosen(
       sourceId = track.videoId;
       uniquePath = 'youtube:${track.videoId}';
       coverUrl = track.cover;
+    } else if (track is SpotifyTrack) {
+      source = 'spotify';
+      sourceId = track.spotifyId;
+      uniquePath = track.filepath;
+      coverUrl = (track.cover != 'none' && track.cover.isNotEmpty)
+          ? track.cover
+          : null;
     } else if (track is LocalTrack && track.filepath.startsWith('sc:')) {
       source = 'soundcloud';
       sourceId = track.filepath.replaceFirst('sc:', '');
@@ -1465,7 +1546,9 @@ Future<void> _handleTracksChosen(
         ? 'yandex:${track.track.id}'
         : track is YTMusicTrack
             ? 'youtube:${track.videoId}'
-            : track.filepath;
+            : track is SpotifyTrack
+                ? track.filepath
+                : track.filepath;
 
     final knownTrack = await (dbInstance.select(
       dbInstance.knownTracks,

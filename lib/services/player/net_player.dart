@@ -93,25 +93,39 @@ class NetConductor {
     }
     // sc
     if (track is LocalTrack && track.filepath.startsWith('sc:')) {
-      print('SC playNet url: ${track.filepath}');
+      print('[NetConductor] playing SoundCloud track: ${track.filepath}');
       final scId = int.tryParse(track.filepath.replaceFirst('sc:', ''));
       if (scId != null) {
-        final url = await SoundCloudService().getStreamUrlWithOAuth(
-          scId,
-        ); // ← не getStreamUrl
-        if (url != null) {
-          await _player.playNetTrack(url, track);
+        try {
+          final url = await SoundCloudService().getStreamUrlWithOAuth(
+            scId,
+          ); // ← не getStreamUrl
+          if (url != null) {
+            await _player.playNetTrack(url, track);
+          } else {
+            print('[NetConductor] SoundCloud track stream URL resolved to null.');
+            await _player.stop();
+          }
+        } catch (e) {
+          print('[NetConductor] Failed to resolve SoundCloud stream: $e');
+          await _player.stop();
         }
+      } else {
+        print('[NetConductor] Invalid SoundCloud ID.');
+        await _player.stop();
       }
     }
 
-    // spotify — skip if playCustom already resolved to http (LocalTrack) or cached streamUrl
-    if (track is SpotifyTrack &&
-        !await File(track.filepath).exists() &&
-        !(track.streamUrl?.startsWith('http') ?? false)) {
+    // spotify
+    if (track is SpotifyTrack && !await File(track.filepath).exists()) {
       try {
-        _operation = CancelableOperation.fromFuture(_playSpotify(track));
-        await _operation!.value;
+        if (track.streamUrl?.startsWith('http') ?? false) {
+          _operation = CancelableOperation.fromFuture(_player.playNetTrack(track.streamUrl!, track));
+          await _operation!.value;
+        } else {
+          _operation = CancelableOperation.fromFuture(_playSpotify(track));
+          await _operation!.value;
+        }
       } catch (e) {
         Logger('NetConductor').severe('Spotify play error: $e');
       }
@@ -123,48 +137,98 @@ class NetConductor {
 
   Future<void> _getLinkAndPlay(PlayerTrack track) async {
     if (_operation?.isCanceled ?? false) return;
-    final quality = DatabaseStreamerService().yandexMusicQuality.value;
-    AudioQuality downloadQuality = switch (quality) {
-      'lossless' => AudioQuality.lossless,
-      'nq' => AudioQuality.normal,
-      'lq' => AudioQuality.low,
-      'mp3' => AudioQuality.normal,
-      _ => AudioQuality.normal,
-    };
-    final link = await _yandex.tracks.getDownloadLink(
-      (track as YandexMusicTrack).track.id,
-      quality: downloadQuality,
-    );
+    final ytrack = (track as YandexMusicTrack);
+    print('[NetConductor] Resolving Yandex Music stream URL for track: "${ytrack.track.title}" (ID: ${ytrack.track.id})');
+    try {
+      final quality = DatabaseStreamerService().yandexMusicQuality.value;
+      AudioQuality downloadQuality = switch (quality) {
+        'lossless' => AudioQuality.lossless,
+        'nq' => AudioQuality.normal,
+        'lq' => AudioQuality.low,
+        'mp3' => AudioQuality.normal,
+        _ => AudioQuality.normal,
+      };
+      print('[NetConductor] Requested Yandex quality: $quality -> $downloadQuality');
+      
+      final link = await _yandex.tracks.getDownloadLink(
+        ytrack.track.id,
+        quality: downloadQuality,
+      );
+      print('[NetConductor] Resolved Yandex stream URL successfully: $link');
 
-    if (_operation?.isCanceled ?? true) return;
-    await _player.playNetTrack(link, track);
+      if (_operation?.isCanceled ?? true) return;
+      await _player.playNetTrack(link, track);
+    } catch (e, st) {
+      print('[NetConductor] Failed to resolve Yandex stream: $e');
+      print('[NetConductor] Stack: $st');
+      if (!(_operation?.isCanceled ?? false)) {
+        print('[NetConductor] Stopping player to prevent playing previous track.');
+        await _player.stop();
+      }
+      rethrow;
+    }
   }
 
   Future<void> _playYoutube(PlayerTrack track) async {
     if (_operation?.isCanceled ?? false) return;
+    try {
+      print('[NetConductor] Resolving YTMusic stream URL for track: "${track.title}" (Video ID: ${(track as YTMusicTrack).videoId})');
+      final ytTrack = await YTMusicAPI().getTrack(
+        (track as YTMusicTrack).videoId,
+      );
 
-    final ytTrack = await YTMusicAPI().getTrack(
-      (track as YTMusicTrack).videoId,
-    );
+      String? link = ytTrack.streamUrl;
+      if (link == null) {
+        print('[NetConductor] YTMusic track stream URL resolved to null.');
+        if (!(_operation?.isCanceled ?? false)) {
+          print('[NetConductor] Stopping player to prevent playing previous track.');
+          await _player.stop();
+        }
+        return;
+      }
+      print('[NetConductor] Resolved YTMusic stream URL successfully.');
 
-    String? link = ytTrack.streamUrl;
-
-    if (link == null) return;
-
-    if (_operation?.isCanceled ?? true) return;
-    await _player.playNetTrack(link, track);
+      if (_operation?.isCanceled ?? true) return;
+      await _player.playNetTrack(link, track);
+    } catch (e, st) {
+      print('[NetConductor] Failed to resolve YTMusic stream: $e');
+      print('[NetConductor] Stack: $st');
+      if (!(_operation?.isCanceled ?? false)) {
+        print('[NetConductor] Stopping player to prevent playing previous track.');
+        await _player.stop();
+      }
+      rethrow;
+    }
   }
 
   Future<void> _playSpotify(SpotifyTrack track) async {
     if (_operation?.isCanceled ?? false) return;
+    try {
+      print('[NetConductor] Resolving Spotify stream URL for track: "${track.title}" (ID: ${track.spotifyId})');
+      final url = await SpotifyService().getStreamUrl(track);
+      if (url == null) {
+        print('[NetConductor] Spotify track stream URL resolved to null.');
+        if (!(_operation?.isCanceled ?? false)) {
+          print('[NetConductor] Stopping player to prevent playing previous track.');
+          await _player.stop();
+        }
+        return;
+      }
+      print('[NetConductor] Resolved Spotify stream URL successfully.');
 
-    final url = await SpotifyService().getStreamUrl(track);
-    if (url == null) return;
+      track.streamUrl = url;
 
-    track.streamUrl = url;
-
-    if (_operation?.isCanceled ?? true) return;
-    await _player.playNetTrack(url, track);
+      if (_operation?.isCanceled ?? true) return;
+      await _player.playNetTrack(url, track);
+    } catch (e, st) {
+      print('[NetConductor] Failed to resolve Spotify stream: $e');
+      print('[NetConductor] Stack: $st');
+      if (!(_operation?.isCanceled ?? false)) {
+        print('[NetConductor] Stopping player to prevent playing previous track.');
+        await _player.stop();
+      }
+      rethrow;
+    }
   }
 
   Future<List<PlayerTrack>> getUncached(List<PlayerTrack> tracks) async {
